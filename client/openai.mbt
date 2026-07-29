@@ -152,49 +152,10 @@ fn to_llm_tool(d : @tools.ToolDescriptor) -> @moonllm.Tool {
 }
 
 ///|
-/// The JSON Schema for one tool-parameter type.
+/// The JSON Schema for one tool-parameter type — rendered by `@tools`, the shared
+/// home for the schema model.
 fn param_schema(t : @tools.ToolParameterType) -> Json {
-  match t {
-    TString => { "type": "string" }
-    TInteger => { "type": "integer" }
-    TFloat => { "type": "number" }
-    TBoolean => { "type": "boolean" }
-    TNull => { "type": "null" }
-    TEnum(values) => {
-      let vs : Array[Json] = []
-      for v in values {
-        vs.push(v.to_json())
-      }
-      Json::object({ "type": Json::string("string"), "enum": Json::array(vs) })
-    }
-    TList(inner) =>
-      Json::object({
-        "type": Json::string("array"),
-        "items": param_schema(inner),
-      })
-    TObject(properties~, required~) => {
-      let props : Map[String, Json] = Map([])
-      for p in properties {
-        props[p.name] = param_schema(p.ptype)
-      }
-      let req : Array[Json] = []
-      for r in required {
-        req.push(r.to_json())
-      }
-      Json::object({
-        "type": Json::string("object"),
-        "properties": Json::object(props),
-        "required": Json::array(req),
-      })
-    }
-    TAnyOf(descs) => {
-      let arr : Array[Json] = []
-      for d in descs {
-        arr.push(param_schema(d.ptype))
-      }
-      Json::object({ "anyOf": Json::array(arr) })
-    }
-  }
+  t.to_json_schema()
 }
 
 ///|

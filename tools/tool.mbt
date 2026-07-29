@@ -38,6 +38,52 @@ pub(all) struct ToolDescriptor {
 } derive(Eq, Debug)
 
 ///|
+/// This parameter type as a JSON Schema fragment — what a tool/function
+/// definition advertises to the model, and what a structured-output request
+/// constrains the reply to. Koog derives the schema from the Kotlin type via
+/// kotlinx.serialization; with no reflection here it is rendered from the explicit
+/// `ToolParameterType`.
+pub fn ToolParameterType::to_json_schema(self : ToolParameterType) -> Json {
+  match self {
+    TString => { "type": "string" }
+    TInteger => { "type": "integer" }
+    TFloat => { "type": "number" }
+    TBoolean => { "type": "boolean" }
+    TNull => { "type": "null" }
+    TEnum(values) => {
+      let vs : Array[Json] = []
+      for v in values {
+        vs.push(v.to_json())
+      }
+      { "type": "string", "enum": Json::array(vs) }
+    }
+    TList(inner) => { "type": "array", "items": inner.to_json_schema() }
+    TObject(properties~, required~) => {
+      let props : Map[String, Json] = Map([])
+      for p in properties {
+        props[p.name] = p.ptype.to_json_schema()
+      }
+      let req : Array[Json] = []
+      for r in required {
+        req.push(r.to_json())
+      }
+      {
+        "type": "object",
+        "properties": Json::object(props),
+        "required": Json::array(req),
+      }
+    }
+    TAnyOf(descs) => {
+      let arr : Array[Json] = []
+      for d in descs {
+        arr.push(d.ptype.to_json_schema())
+      }
+      { "anyOf": Json::array(arr) }
+    }
+  }
+}
+
+///|
 /// A callable tool. Koog's `Tool<TArgs, TResult>` derives its schema from the
 /// argument type via kotlinx.serialization + a `TypeToken`; MoonBit has no
 /// reflection, so a tool states its `descriptor()` explicitly and `execute_raw`

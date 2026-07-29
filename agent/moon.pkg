@@ -9,6 +9,7 @@ import {
   "Lfan-ke/moonkoog/prompt",
   "Lfan-ke/moonkoog/llm",
   "Lfan-ke/moonkoog/tools",
+  "moonbitlang/core/json",
 }
 
 import {
