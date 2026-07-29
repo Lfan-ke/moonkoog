@@ -1,0 +1,123 @@
+///|
+/// Per-request LLM parameters (Koog `LLMParams`, minimized to the MVP surface).
+/// `None` means "let the provider default apply".
+pub(all) struct LLMParams {
+  temperature : Double?
+  max_tokens : Int?
+} derive(Eq, Debug, ToJson)
+
+///|
+/// The empty params: no overrides.
+pub fn LLMParams::default() -> LLMParams {
+  { temperature: None, max_tokens: None }
+}
+
+///|
+/// The immutable request object handed to an LLM: an ordered message list, an
+/// identifier, and the params. Koog builds it through a DSL; here it is built
+/// through the fluent `PromptBuilder`.
+pub(all) struct Prompt {
+  messages : Array[Message]
+  id : String
+  params : LLMParams
+} derive(Eq, Debug)
+
+///|
+/// A copy of this prompt with `message` appended — the immutable-append the agent
+/// loop uses to grow the conversation without mutating a shared value.
+pub fn Prompt::append(self : Prompt, message : Message) -> Prompt {
+  { ..self, messages: [..self.messages, message] }
+}
+
+///|
+/// A mutable builder for a `Prompt`. MoonBit has no receiver-lambda DSL, so the
+/// Koog `prompt { system(...); user(...) }` block becomes a fluent chain
+/// `PromptBuilder::new().system(...).user(...).build()`.
+pub struct PromptBuilder {
+  messages : Array[Message]
+  id : String
+  mut params : LLMParams
+}
+
+///|
+/// A fresh builder.
+pub fn PromptBuilder::new(
+  id? : String = "prompt",
+  params? : LLMParams = LLMParams::default(),
+) -> PromptBuilder {
+  { messages: [], id, params }
+}
+
+///|
+/// Append a system message.
+pub fn PromptBuilder::system(
+  self : PromptBuilder,
+  text : String,
+) -> PromptBuilder {
+  self.messages.push(Message::system(text))
+  self
+}
+
+///|
+/// Append a user message.
+pub fn PromptBuilder::user(
+  self : PromptBuilder,
+  text : String,
+) -> PromptBuilder {
+  self.messages.push(Message::user(text))
+  self
+}
+
+///|
+/// Append an assistant message.
+pub fn PromptBuilder::assistant(
+  self : PromptBuilder,
+  text : String,
+) -> PromptBuilder {
+  self.messages.push(Message::assistant(text))
+  self
+}
+
+///|
+/// Append a whole pre-built message (e.g. an assistant reply carrying tool calls).
+pub fn PromptBuilder::message(
+  self : PromptBuilder,
+  message : Message,
+) -> PromptBuilder {
+  self.messages.push(message)
+  self
+}
+
+///|
+/// Append a user message carrying a single tool result (Koog's `toolResult`; a
+/// `ToolResult` is a request part, so it rides a user message).
+pub fn PromptBuilder::tool_result(
+  self : PromptBuilder,
+  tool~ : String,
+  output~ : String,
+  id? : String? = None,
+  is_error? : Bool = false,
+) -> PromptBuilder {
+  self.messages.push({
+    role: User,
+    parts: [ToolResult(id~, tool~, output~, is_error~)],
+    finish_reason: None,
+  })
+  self
+}
+
+///|
+/// Set the LLM params.
+pub fn PromptBuilder::params(
+  self : PromptBuilder,
+  params : LLMParams,
+) -> PromptBuilder {
+  self.params = params
+  self
+}
+
+///|
+/// Finish building.
+pub fn PromptBuilder::build(self : PromptBuilder) -> Prompt {
+  { messages: self.messages, id: self.id, params: self.params }
+}

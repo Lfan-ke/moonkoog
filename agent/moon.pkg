@@ -1,0 +1,19 @@
+// The agent core — Koog 1.1.1 `agents-core` + the `prompt-executor-clients`
+// contract. Native (the LLM client is async): the LLMClient trait, a scripted
+// MockClient for deterministic tests, the AIAgent, and its singleRunStrategy
+// tool-calling loop. The async runtime (moonbitlang/async) is a test-only
+// dependency used to drive the loop — the library itself is transport-agnostic.
+supported_targets = "native"
+
+import {
+  "Lfan-ke/moonkoog/prompt",
+  "Lfan-ke/moonkoog/llm",
+  "Lfan-ke/moonkoog/tools",
+}
+
+import {
+  "Lfan-ke/moonkoog/prompt",
+  "Lfan-ke/moonkoog/llm",
+  "Lfan-ke/moonkoog/tools",
+  "moonbitlang/async",
+} for "test"
