@@ -1,0 +1,286 @@
+///|
+/// Koog's agent strategy as a directed graph of nodes joined by conditional
+/// edges. `AIAgent.run`'s tool-calling loop is not special-cased — it is one
+/// wiring of this graph (`single_run_strategy` below), the way Koog builds
+/// `singleRunStrategy` from the same `strategy { ... }` DSL. A run threads a
+/// value from the start node along the first outgoing edge whose condition holds,
+/// node to node, until it reaches the finish node.
+///
+/// Koog's nodes are statically typed on their input/output and its edges carry
+/// arbitrary transform lambdas; MoonBit has neither per-node generics across a
+/// heterogeneous graph nor a receiver-lambda DSL, so the value in flight is the
+/// `NodeValue` sum and the standard node behaviours are named `NodeKind`s. Custom
+/// transform nodes land when the value model grows; the graph wiring, the
+/// conditional edges, and the executor are the faithful core.
+/// Source: agents/agents-core/.../agent/entity/{AIAgentStrategy,AIAgentNodeBase,
+/// AIAgentEdge}.kt and AIAgentSimpleStrategies.kt (`singleRunStrategy`).
+
+///|
+/// The value passed between strategy nodes: the text that enters at the start and
+/// leaves at the finish, an LLM assistant reply, or a bare token from a node whose
+/// effect is on the conversation (tools executed) rather than on a carried value.
+pub(all) enum NodeValue {
+  VText(String)
+  VReply(@prompt.Message)
+  VUnit
+} derive(Eq, Debug)
+
+///|
+/// A standard node's behaviour (Koog's `nodeStart` / `nodeFinish` /
+/// `nodeLLMRequest` / `nodeExecuteTool` / `nodeLLMSendToolResult`).
+/// `NodeExecuteTools` runs every tool call in the reply (Koog's multiple-tool
+/// variant), matching the conversation the loop builds.
+pub(all) enum NodeKind {
+  NodeStart
+  NodeFinish
+  NodeLLMRequest
+  NodeExecuteTools
+  NodeLLMSendToolResult
+} derive(Eq, Debug)
+
+///|
+/// When an edge fires, tested against the source node's output. `Always` is an
+/// unconditional edge; `OnAssistantMessage` fires on a plain-text reply (no tool
+/// calls); `OnToolCalls` fires on a reply that requests tools. Koog's `onCondition`
+/// / `onAssistantMessage` / `onToolCall`.
+pub(all) enum EdgeCondition {
+  Always
+  OnAssistantMessage
+  OnToolCalls
+} derive(Eq, Debug)
+
+///|
+/// A directed edge `from -> to` that fires when `condition` holds.
+pub(all) struct StrategyEdge {
+  from : String
+  to : String
+  condition : EdgeCondition
+} derive(Eq, Debug)
+
+///|
+/// A strategy graph: named nodes, edges between them, and the start / finish node
+/// names. `max_steps` bounds node visits, a backstop against a cyclic graph that
+/// never reaches finish (the per-agent `max_iterations` bounds LLM calls).
+pub struct AIAgentStrategy {
+  name : String
+  nodes : Map[String, NodeKind]
+  edges : Array[StrategyEdge]
+  start : String
+  finish : String
+  max_steps : Int
+}
+
+///|
+/// The canonical start / finish node names.
+pub let start_node : String = "__start__"
+
+///|
+pub let finish_node : String = "__finish__"
+
+///|
+/// A strategy seeded with the start and finish nodes, ready to have nodes and
+/// edges added. `max_steps` defaults to a generous backstop.
+pub fn AIAgentStrategy::new(
+  name : String,
+  max_steps? : Int = 1000,
+) -> AIAgentStrategy {
+  {
+    name,
+    nodes: Map([(start_node, NodeStart), (finish_node, NodeFinish)]),
+    edges: [],
+    start: start_node,
+    finish: finish_node,
+    max_steps,
+  }
+}
+
+///|
+/// Add a named node, returning the strategy so calls chain.
+pub fn AIAgentStrategy::node(
+  self : AIAgentStrategy,
+  name : String,
+  kind : NodeKind,
+) -> AIAgentStrategy {
+  self.nodes[name] = kind
+  self
+}
+
+///|
+/// Add an edge `from -> to` firing on `condition` (unconditional by default),
+/// returning the strategy so calls chain.
+pub fn AIAgentStrategy::edge(
+  self : AIAgentStrategy,
+  from : String,
+  to : String,
+  condition? : EdgeCondition = Always,
+) -> AIAgentStrategy {
+  self.edges.push({ from, to, condition })
+  self
+}
+
+///|
+/// Koog's `singleRunStrategy` expressed as a graph: request the LLM; on a
+/// plain-text reply finish, on a tool-call reply execute the tools, feed the
+/// results back, and request again — looping until the model answers in text.
+pub fn single_run_strategy(max_steps? : Int = 1000) -> AIAgentStrategy {
+  AIAgentStrategy::new("single_run", max_steps~)
+  .node("llm_request", NodeLLMRequest)
+  .node("execute_tools", NodeExecuteTools)
+  .node("send_tool_result", NodeLLMSendToolResult)
+  .edge(start_node, "llm_request")
+  .edge("llm_request", finish_node, condition=OnAssistantMessage)
+  .edge("llm_request", "execute_tools", condition=OnToolCalls)
+  .edge("execute_tools", "send_tool_result")
+  .edge("send_tool_result", finish_node, condition=OnAssistantMessage)
+  .edge("send_tool_result", "execute_tools", condition=OnToolCalls)
+}
+
+///|
+/// The mutable run context threaded through the nodes: the executor + model to
+/// call, the tool registry to dispatch to, the growing prompt, and the tool
+/// descriptors advertised on every request.
+priv struct StrategyContext {
+  executor : &LLMClient
+  model : @llm.LLModel
+  tool_registry : @tools.ToolRegistry
+  mut prompt : @prompt.Prompt
+  descriptors : Array[@tools.ToolDescriptor]
+}
+
+///|
+/// Whether `condition` holds for `value`.
+fn edge_matches(condition : EdgeCondition, value : NodeValue) -> Bool {
+  match condition {
+    Always => true
+    OnAssistantMessage =>
+      match value {
+        VReply(m) => m.tool_calls().is_empty()
+        _ => false
+      }
+    OnToolCalls =>
+      match value {
+        VReply(m) => !m.tool_calls().is_empty()
+        _ => false
+      }
+  }
+}
+
+///|
+/// The text a `NodeValue` carries out of the finish node.
+fn node_value_text(value : NodeValue) -> String {
+  match value {
+    VText(s) => s
+    VReply(m) => m.text_content()
+    VUnit => ""
+  }
+}
+
+///|
+/// Run one node against the context, returning its output value.
+async fn run_node(
+  ctx : StrategyContext,
+  kind : NodeKind,
+  value : NodeValue,
+) -> NodeValue {
+  match kind {
+    NodeStart => value
+    NodeFinish => value
+    NodeLLMRequest => {
+      let input = node_value_text(value)
+      ctx.prompt = ctx.prompt.append(@prompt.Message::user(input))
+      let reply = ctx.executor.execute(
+        prompt=ctx.prompt,
+        model=ctx.model,
+        tools=ctx.descriptors,
+      )
+      VReply(reply)
+    }
+    NodeExecuteTools => {
+      guard value is VReply(reply) else { return VUnit }
+      ctx.prompt = ctx.prompt.append(reply)
+      for call in reply.tool_calls() {
+        guard call is @prompt.ToolCall(id~, tool~, args~) else { continue }
+        let output = match ctx.tool_registry.get_tool(tool) {
+          Some(t) =>
+            t.execute_raw(args) catch {
+              e => "tool error: " + e.to_string()
+            }
+          None => "unknown tool: " + tool
+        }
+        ctx.prompt = ctx.prompt.append(
+          @prompt.Message::tool_result(tool~, output~, id~),
+        )
+      }
+      VUnit
+    }
+    NodeLLMSendToolResult => {
+      let reply = ctx.executor.execute(
+        prompt=ctx.prompt,
+        model=ctx.model,
+        tools=ctx.descriptors,
+      )
+      VReply(reply)
+    }
+  }
+}
+
+///|
+/// Run `strategy` on `input`, returning the finish node's text. Seeds the prompt
+/// with the agent's system message, then walks the graph: run the current node,
+/// follow the first outgoing edge whose condition holds, and stop at finish. LLM
+/// requests are bounded by the agent's `max_iterations` (Koog's iteration cap),
+/// node visits by the strategy's `max_steps`.
+pub async fn AIAgent::run_strategy(
+  self : AIAgent,
+  strategy : AIAgentStrategy,
+  input : String,
+) -> String {
+  let builder = @prompt.PromptBuilder::new()
+  if self.system_prompt is Some(sp) {
+    builder.system(sp) |> ignore
+  }
+  let ctx : StrategyContext = {
+    executor: self.executor,
+    model: self.model,
+    tool_registry: self.tool_registry,
+    prompt: builder.build(),
+    descriptors: self.tool_registry.descriptors(),
+  }
+  for step = 0, current = strategy.start, value = VText(input), llm_calls = 0; step <
+     strategy.max_steps; {
+    guard strategy.nodes.get(current) is Some(kind) else {
+      raise AgentError("strategy has no node named '" + current + "'")
+    }
+    let is_llm = kind is (NodeLLMRequest | NodeLLMSendToolResult)
+    guard !(is_llm && llm_calls >= self.max_iterations) else {
+      raise AgentError(
+        "max iterations (" + self.max_iterations.to_string() + ") exceeded",
+      )
+    }
+    let out = run_node(ctx, kind, value)
+    if current == strategy.finish {
+      return node_value_text(out)
+    }
+    guard strategy.edges
+      .iter()
+      .find_first(e => e.from == current && edge_matches(e.condition, out))
+      is Some(edge) else {
+      raise AgentError("no edge out of '" + current + "' matched")
+    }
+    continue step + 1,
+      edge.to,
+      out,
+      if is_llm {
+        llm_calls + 1
+      } else {
+        llm_calls
+      }
+  }
+  raise AgentError(
+    "strategy '" +
+    strategy.name +
+    "' exceeded " +
+    strategy.max_steps.to_string() +
+    " node steps",
+  )
+}

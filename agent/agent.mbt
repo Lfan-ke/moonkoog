@@ -31,54 +31,16 @@ pub fn AIAgent::new(
 }
 
 ///|
-/// Run the agent on `input`, returning the final assistant text. A faithful
-/// implementation of Koog's `singleRunStrategy`:
+/// Run the agent on `input`, returning the final assistant text. Koog's default
+/// `singleRunStrategy`: request a completion; return it if it is plain text;
+/// otherwise run every requested tool, feed the results back, and request again,
+/// bounded by `max_iterations`.
 ///
-/// 1. seed the prompt (system?, then the user input) and request a completion;
-/// 2. if the reply is plain text (no tool calls) → return it;
-/// 3. otherwise keep the assistant reply, run each requested tool, append each
-///    result as a tool-result message, and request again;
-/// 4. repeat, bounded by `max_iterations`.
-///
+/// This delegates to `run_strategy` with `single_run_strategy` — the loop is not
+/// special-cased, it is one wiring of the strategy graph (see strategy.mbt), the
+/// way Koog builds `singleRunStrategy` from the same graph DSL.
 /// Source: agents/agents-core/.../agent/AIAgentSimpleStrategies.kt
 /// (`singleRunStrategy`).
 pub async fn AIAgent::run(self : AIAgent, input : String) -> String {
-  let builder = @prompt.PromptBuilder::new()
-  match self.system_prompt {
-    Some(sp) => builder.system(sp) |> ignore
-    None => ()
-  }
-  builder.user(input) |> ignore
-  let mut prompt = builder.build()
-  let descriptors = self.tool_registry.descriptors()
-  let mut iterations = 0
-  while iterations < self.max_iterations {
-    iterations = iterations + 1
-    let reply = self.executor.execute(
-      prompt~,
-      model=self.model,
-      tools=descriptors,
-    )
-    let calls = reply.tool_calls()
-    if calls.is_empty() {
-      return reply.text_content()
-    }
-    // Keep the assistant reply (carrying its tool-call parts) in the conversation,
-    // then answer every tool call with a tool-result message.
-    prompt = prompt.append(reply)
-    for call in calls {
-      guard call is @prompt.ToolCall(id~, tool~, args~) else { continue }
-      let output = match self.tool_registry.get_tool(tool) {
-        Some(t) =>
-          t.execute_raw(args) catch {
-            e => "tool error: " + e.to_string()
-          }
-        None => "unknown tool: " + tool
-      }
-      prompt = prompt.append(@prompt.Message::tool_result(tool~, output~, id~))
-    }
-  }
-  raise AgentError(
-    "max iterations (" + self.max_iterations.to_string() + ") exceeded",
-  )
+  self.run_strategy(single_run_strategy(), input)
 }
