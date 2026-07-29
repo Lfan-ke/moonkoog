@@ -1,0 +1,16 @@
+// The OpenAI-compatible LLM client — Koog `prompt-executor-clients` (openai/
+// deepseek/…). Native: it maps Koog's prompt/message/tool model onto moonllm's
+// ChatRequest/Message/Tool and back, and moonllm carries the actual transport
+// (native async + TLS + SSE + streamed tool-call reassembly). One client serves
+// any OpenAI-compatible endpoint by its base_url — DeepSeek, Qwen, OpenRouter,
+// Ollama — behind moonkoog's own LLMClient interface, so it stays swappable.
+supported_targets = "native"
+
+import {
+  "Lfan-ke/moonkoog/prompt",
+  "Lfan-ke/moonkoog/llm",
+  "Lfan-ke/moonkoog/tools",
+  "Lfan-ke/moonkoog/agent",
+  "DC-Z-lab/moonllm",
+  "moonbitlang/core/json",
+}

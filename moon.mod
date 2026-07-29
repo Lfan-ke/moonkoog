@@ -1,6 +1,6 @@
 name = "Lfan-ke/moonkoog"
 
-version = "0.1.0"
+version = "0.2.0"
 
 readme = "README.md"
 
@@ -14,4 +14,5 @@ description = "moonkoog — a MoonBit port of JetBrains Koog (1.1.1): a type-saf
 
 import {
   "moonbitlang/async@0.20.3",
+  "DC-Z-lab/moonllm@0.1.0",
 }
