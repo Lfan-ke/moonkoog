@@ -1,0 +1,8 @@
+// Agent checkpoint persistence (← Koog agents-features-snapshot): snapshot an
+// agent's session — its message history and strategy position — and restore it
+// through a storage provider, with an in-memory implementation. Transcribed from
+// the koog AgentCheckpointData + PersistenceStorageProvider source. Pure logic,
+// all backends.
+import {
+  "Lfan-ke/moonkoog/prompt",
+}
