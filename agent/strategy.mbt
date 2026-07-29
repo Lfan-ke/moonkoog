@@ -145,6 +145,7 @@ priv struct StrategyContext {
   tool_registry : @tools.ToolRegistry
   mut prompt : @prompt.Prompt
   descriptors : Array[@tools.ToolDescriptor]
+  events : EventHandler
 }
 
 ///|
@@ -188,11 +189,13 @@ async fn run_node(
     NodeLLMRequest => {
       let input = node_value_text(value)
       ctx.prompt = ctx.prompt.append(@prompt.Message::user(input))
+      (ctx.events.on_llm_call_starting)(ctx.prompt)
       let reply = ctx.executor.execute(
         prompt=ctx.prompt,
         model=ctx.model,
         tools=ctx.descriptors,
       )
+      (ctx.events.on_llm_call_completed)(reply)
       VReply(reply)
     }
     NodeExecuteTools => {
@@ -200,6 +203,7 @@ async fn run_node(
       ctx.prompt = ctx.prompt.append(reply)
       for call in reply.tool_calls() {
         guard call is @prompt.ToolCall(id~, tool~, args~) else { continue }
+        (ctx.events.on_tool_call_starting)(tool, args)
         let output = match ctx.tool_registry.get_tool(tool) {
           Some(t) =>
             t.execute_raw(args) catch {
@@ -207,6 +211,7 @@ async fn run_node(
             }
           None => "unknown tool: " + tool
         }
+        (ctx.events.on_tool_call_completed)(tool, output)
         ctx.prompt = ctx.prompt.append(
           @prompt.Message::tool_result(tool~, output~, id~),
         )
@@ -214,11 +219,13 @@ async fn run_node(
       VUnit
     }
     NodeLLMSendToolResult => {
+      (ctx.events.on_llm_call_starting)(ctx.prompt)
       let reply = ctx.executor.execute(
         prompt=ctx.prompt,
         model=ctx.model,
         tools=ctx.descriptors,
       )
+      (ctx.events.on_llm_call_completed)(reply)
       VReply(reply)
     }
   }
@@ -245,7 +252,9 @@ pub async fn AIAgent::run_strategy(
     tool_registry: self.tool_registry,
     prompt: builder.build(),
     descriptors: self.tool_registry.descriptors(),
+    events: self.events,
   }
+  (self.events.on_agent_starting)(input)
   for step = 0, current = strategy.start, value = VText(input), llm_calls = 0; step <
      strategy.max_steps; {
     guard strategy.nodes.get(current) is Some(kind) else {
@@ -257,9 +266,13 @@ pub async fn AIAgent::run_strategy(
         "max iterations (" + self.max_iterations.to_string() + ") exceeded",
       )
     }
+    (ctx.events.on_node_execution_starting)(current)
     let out = run_node(ctx, kind, value)
+    (ctx.events.on_node_execution_completed)(current)
     if current == strategy.finish {
-      return node_value_text(out)
+      let result = node_value_text(out)
+      (self.events.on_agent_completed)(result)
+      return result
     }
     guard strategy.edges
       .iter()

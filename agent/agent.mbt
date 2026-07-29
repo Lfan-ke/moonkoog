@@ -16,18 +16,21 @@ pub struct AIAgent {
   tool_registry : @tools.ToolRegistry
   system_prompt : String?
   max_iterations : Int
+  events : EventHandler
 }
 
 ///|
-/// Build an agent. `max_iterations` defaults to Koog's 50.
+/// Build an agent. `max_iterations` defaults to Koog's 50; `events` defaults to a
+/// no-op handler (install one to observe the run).
 pub fn AIAgent::new(
   executor : &LLMClient,
   model~ : @llm.LLModel,
   tool_registry? : @tools.ToolRegistry = @tools.ToolRegistry::new(),
   system_prompt? : String? = None,
   max_iterations? : Int = 50,
+  events? : EventHandler = EventHandler::new(),
 ) -> AIAgent {
-  { executor, model, tool_registry, system_prompt, max_iterations }
+  { executor, model, tool_registry, system_prompt, max_iterations, events }
 }
 
 ///|
