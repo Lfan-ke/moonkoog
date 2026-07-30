@@ -38,8 +38,9 @@ pub let mistralai : LLMProvider = { id: "mistralai", display: "MistralAI" }
 ///|
 /// A capability a model may declare. Koog's `LLMCapability` is a sealed hierarchy;
 /// this flattens its leaves (the two JSON-schema levels become `SchemaJsonBasic` /
-/// `SchemaJsonStandard`; `Vision` is a single leaf here rather than its image/video
-/// subtypes — those land when multimodal does).
+/// `SchemaJsonStandard`; the two OpenAI endpoints become `OpenAIEndpointCompletions` /
+/// `OpenAIEndpointResponses`; `Vision` is a single leaf here rather than its
+/// image/video subtypes — those land when multimodal does).
 /// Source: prompt/prompt-llm/.../llm/LLMCapability.kt.
 pub(all) enum LLMCapability {
   Completion
@@ -54,8 +55,11 @@ pub(all) enum LLMCapability {
   PromptCaching
   Moderation
   Thinking
+  Speculation
   SchemaJsonBasic
   SchemaJsonStandard
+  OpenAIEndpointCompletions
+  OpenAIEndpointResponses
 } derive(Eq, Debug)
 
 ///|
