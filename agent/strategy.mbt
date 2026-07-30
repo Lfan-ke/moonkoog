@@ -9,9 +9,10 @@
 /// Koog's nodes are statically typed on their input/output and its edges carry
 /// arbitrary transform lambdas; MoonBit has neither per-node generics across a
 /// heterogeneous graph nor a receiver-lambda DSL, so the value in flight is the
-/// `NodeValue` sum and the standard node behaviours are named `NodeKind`s. Custom
-/// transform nodes land when the value model grows; the graph wiring, the
-/// conditional edges, and the executor are the faithful core.
+/// `NodeValue` sum and the standard node behaviours are named `NodeKind`s.
+/// Arbitrary nodes are `NodeCustom` handlers run against a `NodeSession` — the
+/// MoonBit-idiomatic stand-in for Kotlin's receiver-lambda node DSL — and edges may
+/// carry a value transform, together enough to express Koog's chat and reAct strategies.
 /// Source: agents/agents-core/.../agent/entity/{AIAgentStrategy,AIAgentNodeBase,
 /// AIAgentEdge}.kt and AIAgentSimpleStrategies.kt (`singleRunStrategy`).
 
