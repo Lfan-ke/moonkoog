@@ -47,6 +47,7 @@ pub(all) enum EdgeCondition {
   Always
   OnAssistantMessage
   OnToolCalls
+  OnToolNamed(String)
 } derive(Eq, Debug)
 
 ///|
@@ -161,6 +162,19 @@ fn edge_matches(condition : EdgeCondition, value : NodeValue) -> Bool {
     OnToolCalls =>
       match value {
         VReply(m) => !m.tool_calls().is_empty()
+        _ => false
+      }
+    OnToolNamed(name) =>
+      match value {
+        VReply(m) => {
+          let mut found = false
+          for part in m.tool_calls() {
+            if part is @prompt.ToolCall(tool~, ..) && tool == name {
+              found = true
+            }
+          }
+          found
+        }
         _ => false
       }
   }
