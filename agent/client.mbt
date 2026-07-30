@@ -25,6 +25,35 @@ pub(open) trait LLMClient {
     model~ : @llm.LLModel,
     tools~ : Array[@tools.ToolDescriptor],
   ) -> Array[@prompt.Message]
+  /// Stream the assistant reply, invoking `on_chunk` for each incremental text delta as it
+  /// arrives, and returning the fully assembled reply (Koog `LLMClient.executeStreaming`). The
+  /// default emits the whole reply as a single chunk — a faithful fallback for a client without
+  /// native streaming; a provider that streams overrides it to emit real deltas.
+  async fn execute_streaming(
+    Self,
+    prompt~ : @prompt.Prompt,
+    model~ : @llm.LLModel,
+    tools~ : Array[@tools.ToolDescriptor],
+    on_chunk~ : (String) -> Unit,
+  ) -> @prompt.Message = _
+}
+
+///|
+/// The default streaming behaviour: run the non-streaming `execute` and emit its text as one
+/// chunk. A client whose provider streams (OpenAI-compatible) overrides this.
+impl LLMClient with fn execute_streaming(
+  self,
+  prompt~,
+  model~,
+  tools~,
+  on_chunk~,
+) {
+  let reply = self.execute(prompt~, model~, tools~)
+  let text = reply.text_content()
+  if text != "" {
+    on_chunk(text)
+  }
+  reply
 }
 
 ///|

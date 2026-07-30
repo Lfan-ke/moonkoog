@@ -37,6 +37,39 @@ pub impl @agent.LLMClient for OpenAiCompatibleClient with fn execute(
 }
 
 ///|
+/// Stream the OpenAI-compatible chat completion (Koog `OpenAILLMClient.executeStreaming`):
+/// send with `stream: true`, invoke `on_chunk` for each `text_delta` off the SSE feed, and
+/// assemble the full reply (text plus any streamed tool calls) once the stream ends.
+pub impl @agent.LLMClient for OpenAiCompatibleClient with fn execute_streaming(
+  self,
+  prompt~,
+  model~,
+  tools~,
+  on_chunk~,
+) {
+  let request = to_chat_request(prompt, model, tools)
+  let result = self.inner.chat_stream_full(request, chunk => {
+    if chunk.content is Some(text) {
+      on_chunk(text)
+    }
+  })
+  let parts : Array[@prompt.MessagePart] = []
+  if result.content != "" {
+    parts.push(Text(result.content))
+  }
+  for tc in result.tool_calls {
+    parts.push(
+      ToolCall(
+        id=Some(tc.id),
+        tool=tc.function.name,
+        args=parse_json(tc.function.arguments),
+      ),
+    )
+  }
+  { role: Assistant, parts, finish_reason: result.finish_reason }
+}
+
+///|
 pub impl @agent.LLMClient for OpenAiCompatibleClient with fn provider(self) {
   self.its_provider
 }
