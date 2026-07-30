@@ -104,3 +104,57 @@ pub fn to_anthropic_request(
   }
   Json::object(fields)
 }
+
+///|
+/// Parse an Anthropic Messages API response into a Koog assistant message: each `text` content
+/// block becomes a `Text` part, each `tool_use` block a `ToolCall` (its `input` the arguments),
+/// and `stop_reason` the finish reason.
+pub fn from_anthropic_response(response : Json) -> @prompt.Message {
+  let parts : Array[@prompt.MessagePart] = []
+  let mut finish : String? = None
+  match response {
+    Object(obj) => {
+      match obj.get("content") {
+        Some(Array(blocks)) =>
+          for block in blocks {
+            match block {
+              Object(b) => {
+                let btype = match b.get("type") {
+                  Some(String(t)) => t
+                  _ => ""
+                }
+                if btype == "text" {
+                  match b.get("text") {
+                    Some(String(t)) => parts.push(Text(t))
+                    _ => ()
+                  }
+                } else if btype == "tool_use" {
+                  let id = match b.get("id") {
+                    Some(String(i)) => Some(i)
+                    _ => None
+                  }
+                  let name = match b.get("name") {
+                    Some(String(n)) => n
+                    _ => ""
+                  }
+                  let input = match b.get("input") {
+                    Some(v) => v
+                    None => Json::object({})
+                  }
+                  parts.push(ToolCall(id~, tool=name, args=input))
+                }
+              }
+              _ => ()
+            }
+          }
+        _ => ()
+      }
+      match obj.get("stop_reason") {
+        Some(String(s)) => finish = Some(s)
+        _ => ()
+      }
+    }
+    _ => ()
+  }
+  { role: Assistant, parts, finish_reason: finish }
+}
