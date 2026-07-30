@@ -1,15 +1,56 @@
 ///|
-/// Per-request LLM parameters (Koog `LLMParams`, minimized to the MVP surface).
-/// `None` means "let the provider default apply".
+/// How the model should use tools this request (Koog `LLMParams.ToolChoice`).
+pub(all) enum ToolChoice {
+  /// The model decides whether to call a tool or answer directly.
+  Auto
+  /// The model must not call any tool and only generates text.
+  NoTools
+  /// The model must call a tool.
+  Required
+  /// The model must call the named tool.
+  Named(String)
+} derive(Eq, Debug, ToJson)
+
+///|
+/// A structured-output schema the model must produce (Koog `LLMParams.Schema`): a named JSON
+/// schema, in the provider's basic or the JSON-Schema-standard dialect.
+pub(all) enum Schema {
+  JsonBasic(name~ : String, schema~ : Json)
+  JsonStandard(name~ : String, schema~ : Json)
+} derive(Eq, Debug, ToJson)
+
+///|
+/// Per-request LLM parameters (Koog `LLMParams`). `None` means "let the provider default
+/// apply". This carries the full Koog surface; each client maps the subset its provider
+/// supports.
 pub(all) struct LLMParams {
   temperature : Double?
   max_tokens : Int?
+  number_of_choices : Int?
+  speculation : String?
+  schema : Schema?
+  tool_choice : ToolChoice?
+  user : String?
+  include_thoughts : Bool?
+  thinking_budget : Int?
+  additional_properties : Map[String, Json]?
 } derive(Eq, Debug, ToJson)
 
 ///|
 /// The empty params: no overrides.
 pub fn LLMParams::default() -> LLMParams {
-  { temperature: None, max_tokens: None }
+  {
+    temperature: None,
+    max_tokens: None,
+    number_of_choices: None,
+    speculation: None,
+    schema: None,
+    tool_choice: None,
+    user: None,
+    include_thoughts: None,
+    thinking_budget: None,
+    additional_properties: None,
+  }
 }
 
 ///|
