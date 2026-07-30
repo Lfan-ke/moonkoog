@@ -212,6 +212,37 @@ fn param_schema(t : @tools.ToolParameterType) -> Json {
 }
 
 ///|
+/// Request `number_of_choices` completions (Koog `executeMultipleChoices`) and map each returned
+/// choice to a Koog message. The count comes from the prompt's params (default 1); OpenAI-compatible
+/// endpoints carry it as the `n` field.
+pub impl @agent.LLMClient for OpenAiCompatibleClient with fn execute_multiple(
+  self,
+  prompt~,
+  model~,
+  tools~,
+) {
+  let request = to_chat_request(prompt, model, tools)
+  let count = prompt.params.number_of_choices.unwrap_or(1)
+  if count > 1 {
+    request.n(count) |> ignore
+  }
+  from_chat_response_all(self.inner.chat(request))
+}
+
+///|
+/// Map every choice of a moonllm chat response to a Koog assistant message (Koog
+/// `executeMultipleChoices` returns one per choice).
+fn from_chat_response_all(
+  resp : @moonllm.ChatResponse,
+) -> Array[@prompt.Message] {
+  let out : Array[@prompt.Message] = []
+  for choice in resp.choices {
+    out.push(from_llm_message(choice.message, choice.finish_reason))
+  }
+  out
+}
+
+///|
 /// Map a moonllm chat response to a Koog assistant message (the first choice).
 fn from_chat_response(resp : @moonllm.ChatResponse) -> @prompt.Message {
   guard resp.choices.length() > 0 else {

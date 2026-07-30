@@ -221,3 +221,15 @@ pub impl @agent.LLMClient for AnthropicClient with fn moderate(
   let _ = model
   @agent.ModerationResult::safe()
 }
+
+///|
+/// The Anthropic Messages API returns a single completion (there is no `n`), so multiple choices
+/// collapse to a single-element list.
+pub impl @agent.LLMClient for AnthropicClient with fn execute_multiple(
+  self,
+  prompt~,
+  model~,
+  tools~,
+) {
+  [self.execute(prompt~, model~, tools~)]
+}

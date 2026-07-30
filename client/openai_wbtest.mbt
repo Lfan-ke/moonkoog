@@ -114,6 +114,47 @@ test "moderation_input joins the prompt's text parts" {
 }
 
 ///|
+test "from_chat_response_all maps every choice to its own Koog message" {
+  let resp : @moonllm.ChatResponse = {
+    id: "x",
+    object: "chat.completion",
+    created: 0L,
+    model: "m",
+    choices: [
+      {
+        index: 0,
+        message: {
+          role: @moonllm.Assistant,
+          content: Str("first"),
+          tool_calls: None,
+          tool_call_id: None,
+          name: None,
+        },
+        finish_reason: Some("stop"),
+      },
+      {
+        index: 1,
+        message: {
+          role: @moonllm.Assistant,
+          content: Str("second"),
+          tool_calls: None,
+          tool_call_id: None,
+          name: None,
+        },
+        finish_reason: Some("length"),
+      },
+    ],
+    usage: None,
+    system_fingerprint: None,
+  }
+  let msgs = from_chat_response_all(resp)
+  assert_eq(msgs.length(), 2)
+  assert_eq(msgs[0].text_content(), "first")
+  assert_eq(msgs[1].text_content(), "second")
+  assert_eq(msgs[1].finish_reason, Some("length"))
+}
+
+///|
 test "to_chat_request carries the model, messages, and tools" {
   let p = @prompt.PromptBuilder::new().system("be helpful").user("2+3?").build()
   let d : @tools.ToolDescriptor = {

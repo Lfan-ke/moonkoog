@@ -78,3 +78,27 @@ pub impl LLMClient for MultiLLMClient with fn moderate(self, prompt~, model~) {
       }
   }
 }
+
+///|
+pub impl LLMClient for MultiLLMClient with fn execute_multiple(
+  self,
+  prompt~,
+  model~,
+  tools~,
+) {
+  match self.clients.get(model.provider.id) {
+    Some(client) => client.execute_multiple(prompt~, model~, tools~)
+    None =>
+      match self.fallback {
+        Some(fb) => fb.execute_multiple(prompt~, model~, tools~)
+        None =>
+          [
+            @prompt.Message::assistant(
+              "no LLM client registered for provider '" +
+              model.provider.id +
+              "'",
+            ),
+          ]
+      }
+  }
+}

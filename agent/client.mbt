@@ -5,7 +5,10 @@
 /// may call and returns the assistant reply; any tool calls come back inside the
 /// reply's `parts` as `ToolCall`s. `moderate` checks a prompt against the provider's safety
 /// categories; its default reports nothing harmful, and a client that supports moderation
-/// overrides it. Streaming and multiple-choice are deferred to the async-stream layer.
+/// overrides it. `execute_multiple` returns one reply per requested choice (Koog
+/// `executeMultipleChoices`, the count being `prompt.params.number_of_choices`); a provider
+/// without multi-choice returns a single-element list. Streaming is deferred to the async-stream
+/// layer.
 /// Source: prompt/prompt-executor/prompt-executor-clients/.../LLMClientAPI.kt.
 pub(open) trait LLMClient {
   async fn execute(
@@ -16,6 +19,12 @@ pub(open) trait LLMClient {
   ) -> @prompt.Message
   fn provider(Self) -> @llm.LLMProvider
   async fn moderate(Self, prompt~ : @prompt.Prompt, model~ : @llm.LLModel) -> ModerationResult
+  async fn execute_multiple(
+    Self,
+    prompt~ : @prompt.Prompt,
+    model~ : @llm.LLModel,
+    tools~ : Array[@tools.ToolDescriptor],
+  ) -> Array[@prompt.Message]
 }
 
 ///|
@@ -60,4 +69,14 @@ pub impl LLMClient for MockClient with fn moderate(self, prompt~, model~) {
   let _ = prompt
   let _ = model
   ModerationResult::safe()
+}
+
+///|
+pub impl LLMClient for MockClient with fn execute_multiple(
+  self,
+  prompt~,
+  model~,
+  tools~,
+) {
+  [self.execute(prompt~, model~, tools~)]
 }

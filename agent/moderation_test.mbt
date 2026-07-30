@@ -36,6 +36,16 @@ impl @agent.LLMClient for FlaggingClient with fn moderate(
 }
 
 ///|
+impl @agent.LLMClient for FlaggingClient with fn execute_multiple(
+  self,
+  prompt~,
+  model~,
+  tools~,
+) {
+  [@agent.LLMClient::execute(self, prompt~, model~, tools~)]
+}
+
+///|
 async test "moderation: the default reports nothing harmful; a client can flag categories" {
   @async.with_task_group(_g => {
     // A client without moderation support reports nothing harmful.

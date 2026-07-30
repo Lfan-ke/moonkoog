@@ -89,6 +89,16 @@ impl @agent.LLMClient for LoopClient with fn moderate(_self, prompt~, model~) {
 }
 
 ///|
+impl @agent.LLMClient for LoopClient with fn execute_multiple(
+  self,
+  prompt~,
+  model~,
+  tools~,
+) {
+  [@agent.LLMClient::execute(self, prompt~, model~, tools~)]
+}
+
+///|
 async test "agent runs the singleRunStrategy loop end to end: request, execute tool, feed back, finish" {
   @async.with_task_group(_g => {
     let registry = @tools.ToolRegistry::new().add(AddTool::{  })
