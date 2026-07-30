@@ -52,10 +52,12 @@ pub impl TaskStore for InMemoryTaskStore with fn save(self, task) {
 }
 
 ///|
-/// An A2A server dispatching JSON-RPC requests to `executor`, persisting tasks in `store`.
+/// An A2A server dispatching JSON-RPC requests to `executor`, persisting tasks in `store` and
+/// push-notification configs per task.
 pub struct A2AServer {
   executor : &AgentExecutor
   store : &TaskStore
+  push : Map[String, Array[TaskPushConfig]]
 }
 
 ///|
@@ -64,7 +66,7 @@ pub fn A2AServer::new(
   executor : &AgentExecutor,
   store : &TaskStore,
 ) -> A2AServer {
-  { executor, store }
+  { executor, store, push: Map([]) }
 }
 
 ///|
@@ -142,7 +144,65 @@ fn A2AServer::dispatch(
       self.store.save(task)
       task.to_json()
     }
+    "tasks/pushNotificationConfig/set" => {
+      let cfg = TaskPushConfig::from_json(Json::object(p))
+      let kept : Array[TaskPushConfig] = []
+      for c in self.push_for(cfg.task_id) {
+        if c.config.id != cfg.config.id {
+          kept.push(c)
+        }
+      }
+      kept.push(cfg)
+      self.push[cfg.task_id] = kept
+      cfg.to_json()
+    }
+    "tasks/pushNotificationConfig/get" => {
+      let configs = self.push_for(str_field(p, "id", ""))
+      let found = match opt_str(p, "pushNotificationConfigId") {
+        Some(cid) => {
+          let mut r : TaskPushConfig? = None
+          for c in configs {
+            if c.config.id == Some(cid) {
+              r = Some(c)
+            }
+          }
+          r
+        }
+        None => if configs.length() > 0 { Some(configs[0]) } else { None }
+      }
+      match found {
+        Some(c) => c.to_json()
+        None => raise A2AError("push config not found")
+      }
+    }
+    "tasks/pushNotificationConfig/list" =>
+      Json::array(
+        self.push_for(str_field(p, "id", "")).map(TaskPushConfig::to_json),
+      )
+    "tasks/pushNotificationConfig/delete" => {
+      let cid = str_field(p, "pushNotificationConfigId", "")
+      let kept : Array[TaskPushConfig] = []
+      for c in self.push_for(str_field(p, "id", "")) {
+        if c.config.id != Some(cid) {
+          kept.push(c)
+        }
+      }
+      self.push[str_field(p, "id", "")] = kept
+      Json::null()
+    }
     other => raise A2AError("unknown method: " + other)
+  }
+}
+
+///|
+/// The push-notification configs registered for `task_id` (empty when none).
+fn A2AServer::push_for(
+  self : A2AServer,
+  task_id : String,
+) -> Array[TaskPushConfig] {
+  match self.push.get(task_id) {
+    Some(configs) => configs
+    None => []
   }
 }
 
