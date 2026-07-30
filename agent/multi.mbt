@@ -66,3 +66,15 @@ pub impl LLMClient for MultiLLMClient with fn execute(
 pub impl LLMClient for MultiLLMClient with fn provider(self) {
   self.default_provider
 }
+
+///|
+pub impl LLMClient for MultiLLMClient with fn moderate(self, prompt~, model~) {
+  match self.clients.get(model.provider.id) {
+    Some(client) => client.moderate(prompt~, model~)
+    None =>
+      match self.fallback {
+        Some(fb) => fb.moderate(prompt~, model~)
+        None => ModerationResult::safe()
+      }
+  }
+}

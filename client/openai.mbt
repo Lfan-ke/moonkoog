@@ -42,6 +42,21 @@ pub impl @agent.LLMClient for OpenAiCompatibleClient with fn provider(self) {
 }
 
 ///|
+/// The OpenAI-compatible moderation endpoint (`/moderations`) is a separate route from chat
+/// completions and is not exposed by the moonllm chat client, so this reports nothing harmful
+/// until that call is wired; the moderation contract itself is honoured here.
+pub impl @agent.LLMClient for OpenAiCompatibleClient with fn moderate(
+  self,
+  prompt~,
+  model~,
+) {
+  let _ = self
+  let _ = prompt
+  let _ = model
+  @agent.ModerationResult::safe()
+}
+
+///|
 /// Map a Koog prompt + model + tool descriptors to a moonllm chat request.
 fn to_chat_request(
   prompt : @prompt.Prompt,

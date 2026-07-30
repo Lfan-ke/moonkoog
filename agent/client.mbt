@@ -3,8 +3,9 @@
 /// single-LLM `PromptExecutor` — a single-provider executor is a one-line delegate
 /// to its client). `execute` sends a prompt with the tool descriptors the model
 /// may call and returns the assistant reply; any tool calls come back inside the
-/// reply's `parts` as `ToolCall`s. Streaming / multiple-choice / moderation are
-/// deferred (Koog has them; out of MVP scope).
+/// reply's `parts` as `ToolCall`s. `moderate` checks a prompt against the provider's safety
+/// categories; its default reports nothing harmful, and a client that supports moderation
+/// overrides it. Streaming and multiple-choice are deferred to the async-stream layer.
 /// Source: prompt/prompt-executor/prompt-executor-clients/.../LLMClientAPI.kt.
 pub(open) trait LLMClient {
   async fn execute(
@@ -14,6 +15,7 @@ pub(open) trait LLMClient {
     tools~ : Array[@tools.ToolDescriptor],
   ) -> @prompt.Message
   fn provider(Self) -> @llm.LLMProvider
+  async fn moderate(Self, prompt~ : @prompt.Prompt, model~ : @llm.LLModel) -> ModerationResult
 }
 
 ///|
@@ -50,4 +52,12 @@ pub impl LLMClient for MockClient with fn execute(self, prompt~, model~, tools~)
 ///|
 pub impl LLMClient for MockClient with fn provider(self) {
   self.provider_id
+}
+
+///|
+pub impl LLMClient for MockClient with fn moderate(self, prompt~, model~) {
+  let _ = self
+  let _ = prompt
+  let _ = model
+  ModerationResult::safe()
 }
