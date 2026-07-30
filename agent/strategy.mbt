@@ -36,6 +36,10 @@ pub(all) enum NodeKind {
   NodeLLMRequest
   NodeExecuteTools
   NodeLLMSendToolResult
+  // A parametrized LLM request that first appends a fixed instruction (Koog's custom
+  // `node { ... appendPrompt { user(...) }; requestLLM() }` — e.g. the chat strategy's
+  // "call a tool instead of chatting" nudge), then requests the model.
+  NodeLLMRequestWith(String)
 } derive(Eq, Debug)
 
 ///|
@@ -56,6 +60,10 @@ pub(all) struct StrategyEdge {
   from : String
   to : String
   condition : EdgeCondition
+  // When set, the value carried to `to` is replaced by this text (Koog's edge
+  // `transformed { ... }`) — e.g. the chat strategy finishing on the exit tool with
+  // "Chat finished" rather than the tool call.
+  transform : String?
 } derive(Eq, Debug)
 
 ///|
@@ -114,8 +122,9 @@ pub fn AIAgentStrategy::edge(
   from : String,
   to : String,
   condition? : EdgeCondition = Always,
+  transform? : String? = None,
 ) -> AIAgentStrategy {
-  self.edges.push({ from, to, condition })
+  self.edges.push({ from, to, condition, transform })
   self
 }
 
@@ -132,6 +141,34 @@ pub fn single_run_strategy(max_steps? : Int = 1000) -> AIAgentStrategy {
   .edge("llm_request", finish_node, condition=OnAssistantMessage)
   .edge("llm_request", "execute_tools", condition=OnToolCalls)
   .edge("execute_tools", "send_tool_result")
+  .edge("send_tool_result", finish_node, condition=OnAssistantMessage)
+  .edge("send_tool_result", "execute_tools", condition=OnToolCalls)
+}
+
+///|
+/// Koog's `chatAgentStrategy` expressed as a graph: request the LLM; a tool call is
+/// executed, but a plain-text reply is nudged ("call a tool instead of chatting") and the
+/// LLM re-requested until it calls a tool; the loop finishes when the model calls the exit
+/// tool (`__exit__`), whose edge carries "Chat finished" as the result.
+pub fn chat_agent_strategy(max_steps? : Int = 1000) -> AIAgentStrategy {
+  let nudge = "Don't reply with plain text. Call one of the available tools instead."
+  AIAgentStrategy::new("chat", max_steps~)
+  .node("llm_request", NodeLLMRequest)
+  .node("feedback", NodeLLMRequestWith(nudge))
+  .node("execute_tools", NodeExecuteTools)
+  .node("send_tool_result", NodeLLMSendToolResult)
+  .edge(start_node, "llm_request")
+  .edge("llm_request", "execute_tools", condition=OnToolCalls)
+  .edge("llm_request", "feedback", condition=OnAssistantMessage)
+  .edge("feedback", "feedback", condition=OnAssistantMessage)
+  .edge("feedback", "execute_tools", condition=OnToolCalls)
+  .edge("execute_tools", "send_tool_result")
+  .edge(
+    "send_tool_result",
+    finish_node,
+    condition=OnToolNamed("__exit__"),
+    transform=Some("Chat finished"),
+  )
   .edge("send_tool_result", finish_node, condition=OnAssistantMessage)
   .edge("send_tool_result", "execute_tools", condition=OnToolCalls)
 }
@@ -242,6 +279,21 @@ async fn run_node(
       (ctx.events.on_llm_call_completed)(reply)
       VReply(reply)
     }
+    NodeLLMRequestWith(instruction) => {
+      // Keep the previous reply in the conversation, then nudge and re-request.
+      if value is VReply(prev) {
+        ctx.prompt = ctx.prompt.append(prev)
+      }
+      ctx.prompt = ctx.prompt.append(@prompt.Message::user(instruction))
+      (ctx.events.on_llm_call_starting)(ctx.prompt)
+      let reply = ctx.executor.execute(
+        prompt=ctx.prompt,
+        model=ctx.model,
+        tools=ctx.descriptors,
+      )
+      (ctx.events.on_llm_call_completed)(reply)
+      VReply(reply)
+    }
   }
 }
 
@@ -274,7 +326,8 @@ pub async fn AIAgent::run_strategy(
     guard strategy.nodes.get(current) is Some(kind) else {
       raise AgentError("strategy has no node named '" + current + "'")
     }
-    let is_llm = kind is (NodeLLMRequest | NodeLLMSendToolResult)
+    let is_llm = kind
+      is (NodeLLMRequest | NodeLLMSendToolResult | NodeLLMRequestWith(_))
     guard !(is_llm && llm_calls >= self.max_iterations) else {
       raise AgentError(
         "max iterations (" + self.max_iterations.to_string() + ") exceeded",
@@ -294,9 +347,13 @@ pub async fn AIAgent::run_strategy(
       is Some(edge) else {
       raise AgentError("no edge out of '" + current + "' matched")
     }
+    let carried = match edge.transform {
+      Some(t) => VText(t)
+      None => out
+    }
     continue step + 1,
       edge.to,
-      out,
+      carried,
       if is_llm {
         llm_calls + 1
       } else {
