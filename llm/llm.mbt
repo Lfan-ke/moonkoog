@@ -85,20 +85,5 @@ pub fn LLModel::supports(self : LLModel, capability : LLMCapability) -> Bool {
   false
 }
 
-///|
-/// DeepSeek V4 Flash — moonkoog's default smoke-test model.
-/// Source: prompt/.../clients/deepseek/DeepSeekModels.kt (`DeepSeekV4Flash`).
-pub let deepseek_v4_flash : LLModel = {
-  provider: deepseek,
-  id: "deepseek-v4-flash",
-  capabilities: [
-    Completion,
-    Temperature,
-    Tools,
-    ToolChoice,
-    SchemaJsonStandard,
-    Thinking,
-  ],
-  context_length: Some(1_000_000),
-  max_output_tokens: Some(384_000),
-}
+// The predefined model catalogs live in their per-provider files: `openai_models.mbt`,
+// `anthropic_models.mbt`, `google_models.mbt`, `deepseek_models.mbt`.
