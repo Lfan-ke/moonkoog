@@ -17,4 +17,5 @@ import {
   "Lfan-ke/moonkoog/llm",
   "Lfan-ke/moonkoog/tools",
   "moonbitlang/async",
+  "moonbitlang/core/json",
 } for "test"
