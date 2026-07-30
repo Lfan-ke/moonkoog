@@ -56,6 +56,21 @@ test "anthropic request: params max_tokens and temperature are carried" {
 }
 
 ///|
+test "anthropic client: constructs and reports the Anthropic provider" {
+  let client = AnthropicClient::new(api_key="test-key")
+  let c : &@agent.LLMClient = client
+  assert_eq(c.provider(), @llm.anthropic)
+  // A custom gateway base_url and anthropic-version are accepted by the builder.
+  let gateway = AnthropicClient::new(
+    api_key="k",
+    base_url="https://gateway.example/v1",
+    version="2024-01-01",
+  )
+  let g : &@agent.LLMClient = gateway
+  assert_eq(g.provider(), @llm.anthropic)
+}
+
+///|
 test "anthropic response: text and tool_use blocks become a Koog assistant message" {
   let response = @json.parse(
     (

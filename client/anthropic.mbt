@@ -158,3 +158,66 @@ pub fn from_anthropic_response(response : Json) -> @prompt.Message {
   }
   { role: Assistant, parts, finish_reason: finish }
 }
+
+///|
+/// An Anthropic Messages API client (Koog `AnthropicLLMClient`) — the second wire format alongside
+/// the OpenAI-compatible client. It implements moonkoog's `LLMClient` by mapping Koog's
+/// prompt/message/tool model onto the Anthropic request/response JSON (`to_anthropic_request` /
+/// `from_anthropic_response`) and POSTing to `/messages`; moonllm carries the HTTPS transport,
+/// configured for Anthropic's `x-api-key` auth and required `anthropic-version` header.
+/// Source: prompt/.../clients/anthropic/AnthropicLLMClient.kt.
+pub struct AnthropicClient {
+  inner : @moonllm.Client
+}
+
+///|
+/// Build a client for the Anthropic Messages API, authenticating with `api_key` via `x-api-key`
+/// and sending the `anthropic-version`. `base_url` defaults to Anthropic's public API; point it at
+/// a compatible gateway to override.
+pub fn AnthropicClient::new(
+  api_key~ : String,
+  base_url? : String = "https://api.anthropic.com/v1",
+  version? : String = "2023-06-01",
+  timeout_ms? : Int = 60000,
+) -> AnthropicClient {
+  let inner = @moonllm.ClientBuilder::new()
+    .api_key(api_key)
+    .base_url(base_url)
+    .anthropic(version~)
+    .timeout_ms(timeout_ms)
+    .build()
+  { inner, }
+}
+
+///|
+pub impl @agent.LLMClient for AnthropicClient with fn execute(
+  self,
+  prompt~,
+  model~,
+  tools~,
+) {
+  let body = to_anthropic_request(prompt, model, tools)
+  let response = self.inner.post_json("/messages", body)
+  from_anthropic_response(response)
+}
+
+///|
+pub impl @agent.LLMClient for AnthropicClient with fn provider(self) {
+  let _ = self
+  @llm.anthropic
+}
+
+///|
+/// Anthropic exposes no standalone moderation endpoint (unlike OpenAI's `/moderations`), so this
+/// honours the moderation contract by reporting nothing harmful; callers needing real moderation
+/// route it through a provider that offers it.
+pub impl @agent.LLMClient for AnthropicClient with fn moderate(
+  self,
+  prompt~,
+  model~,
+) {
+  let _ = self
+  let _ = prompt
+  let _ = model
+  @agent.ModerationResult::safe()
+}
