@@ -26,6 +26,16 @@ pub(all) enum NodeValue {
 } derive(Eq, Debug)
 
 ///|
+/// The text a `NodeValue` carries: the raw text, an assistant reply's text, or empty.
+pub fn NodeValue::text(self : NodeValue) -> String {
+  match self {
+    VText(s) => s
+    VReply(m) => m.text_content()
+    VUnit => ""
+  }
+}
+
+///|
 /// A standard node's behaviour (Koog's `nodeStart` / `nodeFinish` /
 /// `nodeLLMRequest` / `nodeExecuteTool` / `nodeLLMSendToolResult`).
 /// `NodeExecuteTools` runs every tool call in the reply (Koog's multiple-tool
@@ -40,6 +50,11 @@ pub(all) enum NodeKind {
   // `node { ... appendPrompt { user(...) }; requestLLM() }` — e.g. the chat strategy's
   // "call a tool instead of chatting" nudge), then requests the model.
   NodeLLMRequestWith(String)
+  // A node whose behaviour is an arbitrary handler registered by name (Koog's fully
+  // general `node<In, Out> { ... }`). The handler runs against a `NodeSession` — the
+  // MoonBit-idiomatic stand-in for Kotlin's receiver-lambda session, giving closures the
+  // request/append/storage operations a custom node needs (e.g. reAct's reasoning steps).
+  NodeCustom(String)
 } derive(Eq, Debug)
 
 ///|
@@ -74,6 +89,8 @@ pub struct AIAgentStrategy {
   name : String
   nodes : Map[String, NodeKind]
   edges : Array[StrategyEdge]
+  // Handlers for `NodeCustom` nodes, keyed by node name.
+  custom : Map[String, async (NodeSession, NodeValue) -> NodeValue]
   start : String
   finish : String
   max_steps : Int
@@ -97,6 +114,7 @@ pub fn AIAgentStrategy::new(
     name,
     nodes: Map([(start_node, NodeStart), (finish_node, NodeFinish)]),
     edges: [],
+    custom: Map([]),
     start: start_node,
     finish: finish_node,
     max_steps,
@@ -111,6 +129,19 @@ pub fn AIAgentStrategy::node(
   kind : NodeKind,
 ) -> AIAgentStrategy {
   self.nodes[name] = kind
+  self
+}
+
+///|
+/// Add a custom node `name` whose behaviour is `handler` — an arbitrary step run against a
+/// `NodeSession` (Koog's `node<In, Out> { ... }`). Returns the strategy so calls chain.
+pub fn AIAgentStrategy::custom_node(
+  self : AIAgentStrategy,
+  name : String,
+  handler : async (NodeSession, NodeValue) -> NodeValue,
+) -> AIAgentStrategy {
+  self.nodes[name] = NodeCustom(name)
+  self.custom[name] = handler
   self
 }
 
@@ -174,16 +205,135 @@ pub fn chat_agent_strategy(max_steps? : Int = 1000) -> AIAgentStrategy {
 }
 
 ///|
+/// Koog's `reActStrategy`: alternate reasoning and action. Each round reasons (a tools-off
+/// request seeded with `reasoning_prompt`), then acts (a request with tools); a tool call is
+/// executed and, every `reasoning_interval` rounds, the results are reasoned over before the
+/// next action; a plain-text reply finishes. Built on custom nodes carrying a reasoning-step
+/// counter in the session's per-run store.
+pub fn react_strategy(
+  reasoning_interval? : Int = 1,
+  reasoning_prompt? : String = "Please give your thoughts about the task and plan the next steps.",
+  max_steps? : Int = 1000,
+) -> AIAgentStrategy {
+  let interval = if reasoning_interval > 0 { reasoning_interval } else { 1 }
+  AIAgentStrategy::new("re_act", max_steps~)
+  .custom_node("setup", (s, v) => {
+    s.set("step", 0)
+    v
+  })
+  .custom_node("reason_input", (s, v) => {
+    s.append_user(v.text())
+    s.append_user(reasoning_prompt)
+    s.append(s.request_llm_no_tools())
+    VUnit
+  })
+  .custom_node("call_llm", (s, _v) => VReply(s.request_llm()))
+  .node("execute_tools", NodeExecuteTools)
+  .custom_node("reason_after", (s, _v) => {
+    let step = match s.get("step") {
+      Some(n) => n
+      None => 0
+    }
+    if step % interval == 0 {
+      s.append_user(reasoning_prompt)
+      s.append(s.request_llm_no_tools())
+    }
+    s.set("step", step + 1)
+    VUnit
+  })
+  .edge(start_node, "setup")
+  .edge("setup", "reason_input")
+  .edge("reason_input", "call_llm")
+  .edge("call_llm", "execute_tools", condition=OnToolCalls)
+  .edge("call_llm", finish_node, condition=OnAssistantMessage)
+  .edge("execute_tools", "reason_after")
+  .edge("reason_after", "call_llm")
+}
+
+///|
 /// The mutable run context threaded through the nodes: the executor + model to
 /// call, the tool registry to dispatch to, the growing prompt, and the tool
 /// descriptors advertised on every request.
-priv struct StrategyContext {
+struct StrategyContext {
   executor : &LLMClient
   model : @llm.LLModel
   tool_registry : @tools.ToolRegistry
   mut prompt : @prompt.Prompt
   descriptors : Array[@tools.ToolDescriptor]
   events : EventHandler
+  // Custom-node handlers by name, and a small per-run integer store custom nodes use to
+  // carry state across the graph (e.g. reAct's reasoning-step counter).
+  custom : Map[String, async (NodeSession, NodeValue) -> NodeValue]
+  storage : Map[String, Int]
+}
+
+///|
+/// The session a custom node runs against (Koog's `AIAgentLLMWriteSession` receiver): the
+/// request/append/storage operations a node closure needs, without exposing the whole
+/// context. This is the MoonBit stand-in for Kotlin's receiver-lambda node DSL.
+pub struct NodeSession {
+  ctx : StrategyContext
+}
+
+///|
+/// Append a user message to the conversation.
+pub fn NodeSession::append_user(self : NodeSession, text : String) -> Unit {
+  self.ctx.prompt = self.ctx.prompt.append(@prompt.Message::user(text))
+}
+
+///|
+/// Append a ready message to the conversation.
+pub fn NodeSession::append(
+  self : NodeSession,
+  message : @prompt.Message,
+) -> Unit {
+  self.ctx.prompt = self.ctx.prompt.append(message)
+}
+
+///|
+/// Request the model with the advertised tools (Koog `requestLLM`).
+pub async fn NodeSession::request_llm(self : NodeSession) -> @prompt.Message {
+  (self.ctx.events.on_llm_call_starting)(self.ctx.prompt)
+  let reply = self.ctx.executor.execute(
+    prompt=self.ctx.prompt,
+    model=self.ctx.model,
+    tools=self.ctx.descriptors,
+  )
+  (self.ctx.events.on_llm_call_completed)(reply)
+  reply
+}
+
+///|
+/// Request the model with no tools — a reasoning step (Koog `requestLLMWithoutTools`).
+pub async fn NodeSession::request_llm_no_tools(
+  self : NodeSession,
+) -> @prompt.Message {
+  (self.ctx.events.on_llm_call_starting)(self.ctx.prompt)
+  let reply = self.ctx.executor.execute(
+    prompt=self.ctx.prompt,
+    model=self.ctx.model,
+    tools=[],
+  )
+  (self.ctx.events.on_llm_call_completed)(reply)
+  reply
+}
+
+///|
+/// Read a per-run counter (`None` if unset).
+pub fn NodeSession::get(self : NodeSession, key : String) -> Int? {
+  self.ctx.storage.get(key)
+}
+
+///|
+/// Write a per-run counter.
+pub fn NodeSession::set(self : NodeSession, key : String, value : Int) -> Unit {
+  self.ctx.storage[key] = value
+}
+
+///|
+/// The names of the tools advertised to the model.
+pub fn NodeSession::tool_names(self : NodeSession) -> Array[String] {
+  self.ctx.descriptors.map(d => d.name)
 }
 
 ///|
@@ -294,6 +444,11 @@ async fn run_node(
       (ctx.events.on_llm_call_completed)(reply)
       VReply(reply)
     }
+    NodeCustom(key) =>
+      match ctx.custom.get(key) {
+        Some(handler) => handler({ ctx, }, value)
+        None => value
+      }
   }
 }
 
@@ -319,6 +474,8 @@ pub async fn AIAgent::run_strategy(
     prompt: builder.build(),
     descriptors: self.tool_registry.descriptors(),
     events: self.events,
+    custom: strategy.custom,
+    storage: Map([]),
   }
   (self.events.on_agent_starting)(input)
   for step = 0, current = strategy.start, value = VText(input), llm_calls = 0; step <
