@@ -80,6 +80,18 @@ pub fn[Doc] VectorStore::size(self : VectorStore[Doc]) -> Int {
 }
 
 ///|
+/// Every stored `(document, vector)` pair — the input a similarity search ranks over.
+pub fn[Doc] VectorStore::pairs(
+  self : VectorStore[Doc],
+) -> Array[(Doc, @embeddings.Vector)] {
+  let out : Array[(Doc, @embeddings.Vector)] = []
+  for _id, pair in self.entries {
+    out.push(pair)
+  }
+  out
+}
+
+///|
 /// Rank `documents` (each a document paired with its embedding) against `query` by cosine similarity
 /// (Koog `EmbeddingStorage.search`): score each, keep those at or above `min_score`, sort by score
 /// descending, then skip `offset` and keep at most `limit`. Raises `@embeddings.VectorError` on a
