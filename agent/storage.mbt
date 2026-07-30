@@ -68,3 +68,21 @@ pub fn AgentStorage::clear(self : AgentStorage) -> Unit {
 pub fn AgentStorage::size(self : AgentStorage) -> Int {
   self.entries.length()
 }
+
+///|
+/// A Json snapshot of the whole store — every entry as a field of a Json object (Koog's
+/// `toSerializedMap`). This is what a checkpoint persists.
+pub fn AgentStorage::snapshot(self : AgentStorage) -> Json {
+  Json::object(self.entries)
+}
+
+///|
+/// Replace the store's contents from a `snapshot` Json object, for restoring from a checkpoint.
+pub fn AgentStorage::restore(self : AgentStorage, snapshot : Json) -> Unit {
+  self.entries.clear()
+  if snapshot is Object(obj) {
+    for key, value in obj {
+      self.entries[key] = value
+    }
+  }
+}
