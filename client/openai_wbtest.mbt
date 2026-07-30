@@ -79,6 +79,41 @@ test "from_llm_message maps text and tool calls back to Koog parts" {
 }
 
 ///|
+test "from_moderation_response maps flags and confidence scores to a Koog verdict" {
+  let resp : @moonllm.ModerationResponse = {
+    model: "omni-moderation-latest",
+    results: [
+      {
+        flagged: true,
+        categories: { "hate": true, "violence": false },
+        category_scores: { "hate": 0.92, "violence": 0.03 },
+      },
+    ],
+  }
+  let verdict = from_moderation_response(resp)
+  assert_eq(verdict.is_harmful, true)
+  assert_eq(verdict.is_category_detected("hate"), true)
+  assert_eq(verdict.is_category_detected("violence"), false)
+  guard verdict.categories.get("hate") is Some(hate) else {
+    fail("no hate category")
+  }
+  assert_eq(hate.detected, true)
+  assert_eq(hate.confidence_score, Some(0.92))
+}
+
+///|
+test "from_moderation_response is safe when the response carries no results" {
+  let resp : @moonllm.ModerationResponse = { model: "m", results: [] }
+  assert_eq(from_moderation_response(resp).is_harmful, false)
+}
+
+///|
+test "moderation_input joins the prompt's text parts" {
+  let p = @prompt.PromptBuilder::new().system("policy").user("bad text").build()
+  assert_eq(moderation_input(p), "policy\nbad text")
+}
+
+///|
 test "to_chat_request carries the model, messages, and tools" {
   let p = @prompt.PromptBuilder::new().system("be helpful").user("2+3?").build()
   let d : @tools.ToolDescriptor = {

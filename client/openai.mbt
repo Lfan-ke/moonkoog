@@ -42,18 +42,56 @@ pub impl @agent.LLMClient for OpenAiCompatibleClient with fn provider(self) {
 }
 
 ///|
-/// The OpenAI-compatible moderation endpoint (`/moderations`) is a separate route from chat
-/// completions and is not exposed by the moonllm chat client, so this reports nothing harmful
-/// until that call is wired; the moderation contract itself is honoured here.
+/// Moderate the prompt through the OpenAI-compatible `/moderations` endpoint (Koog
+/// `OpenAILLMClient.moderate`): the prompt's text is sent to the moderation model and the returned
+/// per-category flags and confidence scores are mapped back to a Koog `ModerationResult`.
 pub impl @agent.LLMClient for OpenAiCompatibleClient with fn moderate(
   self,
   prompt~,
   model~,
 ) {
-  let _ = self
-  let _ = prompt
-  let _ = model
-  @agent.ModerationResult::safe()
+  let request = @moonllm.ModerationRequest::of_text(moderation_input(prompt)).model(
+    model.id,
+  )
+  let response = self.inner.moderations(request)
+  from_moderation_response(response)
+}
+
+///|
+/// The text a prompt contributes to moderation: every message's `Text` parts, newline-joined.
+fn moderation_input(prompt : @prompt.Prompt) -> String {
+  let sb = StringBuilder::new()
+  let mut first = true
+  for m in prompt.messages {
+    for part in m.parts {
+      if part is Text(t) {
+        if !first {
+          sb.write_string("\n")
+        }
+        sb.write_string(t)
+        first = false
+      }
+    }
+  }
+  sb.to_string()
+}
+
+///|
+/// Map a moonllm moderation response (the first result) to a Koog `ModerationResult`: the input's
+/// `flagged` becomes `is_harmful`, and each category's flag pairs with its confidence score.
+fn from_moderation_response(
+  resp : @moonllm.ModerationResponse,
+) -> @agent.ModerationResult {
+  guard resp.results.length() > 0 else { @agent.ModerationResult::safe() }
+  let r = resp.results[0]
+  let categories : Map[String, @agent.ModerationCategoryResult] = Map([])
+  for name, detected in r.categories {
+    categories[name] = {
+      detected,
+      confidence_score: r.category_scores.get(name),
+    }
+  }
+  { is_harmful: r.flagged, categories }
 }
 
 ///|
