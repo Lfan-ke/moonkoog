@@ -56,6 +56,41 @@ test "anthropic request: params max_tokens and temperature are carried" {
 }
 
 ///|
+test "anthropic request: tool_choice maps to Anthropic's typed object" {
+  let named = @prompt.PromptBuilder::new(params={
+      ..@prompt.LLMParams::default(),
+      tool_choice: Some(@prompt.Named("search")),
+    })
+    .user("go")
+    .build()
+  guard to_anthropic_request(named, anthropic_test_model(), []) is Object(obj) else {
+    fail("request is not an object")
+  }
+  assert_eq(
+    obj.get("tool_choice"),
+    Some(
+      Json::object({
+        "type": Json::string("tool"),
+        "name": Json::string("search"),
+      }),
+    ),
+  )
+  let required = @prompt.PromptBuilder::new(params={
+      ..@prompt.LLMParams::default(),
+      tool_choice: Some(@prompt.Required),
+    })
+    .user("go")
+    .build()
+  guard to_anthropic_request(required, anthropic_test_model(), []) is Object(r) else {
+    fail("request is not an object")
+  }
+  assert_eq(
+    r.get("tool_choice"),
+    Some(Json::object({ "type": Json::string("any") })),
+  )
+}
+
+///|
 test "anthropic client: constructs and reports the Anthropic provider" {
   let client = AnthropicClient::new(api_key="test-key")
   let c : &@agent.LLMClient = client

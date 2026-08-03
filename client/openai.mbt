@@ -152,7 +152,35 @@ fn to_chat_request(
   if prompt.params.max_tokens is Some(n) {
     request.max_tokens(n) |> ignore
   }
+  if prompt.params.tool_choice is Some(tc) {
+    request.tool_choice(to_llm_tool_choice(tc)) |> ignore
+  }
+  if prompt.params.schema is Some(s) {
+    request.response_format(to_llm_response_format(s)) |> ignore
+  }
   request
+}
+
+///|
+/// Map a Koog tool-choice to moonllm's OpenAI `tool_choice` shape (`auto`/`none`/`required`/
+/// `{type:function,function:{name}}`).
+fn to_llm_tool_choice(tc : @prompt.ToolChoice) -> @moonllm.ToolChoice {
+  match tc {
+    Auto => @moonllm.Auto
+    NoTools => @moonllm.NoneChoice
+    Required => @moonllm.Required
+    Named(name) => @moonllm.Function(name)
+  }
+}
+
+///|
+/// Map a Koog structured-output schema to an OpenAI `response_format` (`json_schema`); both Koog
+/// dialects collapse onto OpenAI's single json_schema form.
+fn to_llm_response_format(s : @prompt.Schema) -> @moonllm.ResponseFormat {
+  match s {
+    JsonBasic(name~, schema~) => @moonllm.JsonSchema(name~, schema~)
+    JsonStandard(name~, schema~) => @moonllm.JsonSchema(name~, schema~)
+  }
 }
 
 ///|

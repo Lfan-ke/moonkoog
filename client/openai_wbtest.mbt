@@ -155,6 +155,56 @@ test "from_chat_response_all maps every choice to its own Koog message" {
 }
 
 ///|
+test "to_chat_request maps tool_choice=Required and a schema to the wire request" {
+  let schema : Json = {
+    "type": "object",
+    "properties": { "answer": { "type": "string" } },
+  }
+  let params : @prompt.LLMParams = {
+    ..@prompt.LLMParams::default(),
+    tool_choice: Some(@prompt.Required),
+    schema: Some(@prompt.JsonStandard(name="out", schema~)),
+  }
+  let p = @prompt.PromptBuilder::new(params~).user("2+3?").build()
+  let req = to_chat_request(p, @llm.deepseek_v4_flash, [])
+  guard req.to_json() is Object(obj) else {
+    fail("request json is not an object")
+  }
+  assert_eq(obj.get("tool_choice"), Some(Json::string("required")))
+  assert_eq(
+    obj.get("response_format"),
+    Some(
+      Json::object({
+        "type": Json::string("json_schema"),
+        "json_schema": Json::object({
+          "name": Json::string("out"),
+          "schema": schema,
+        }),
+      }),
+    ),
+  )
+}
+
+///|
+test "to_chat_request maps a named tool-choice to the function shape" {
+  let params : @prompt.LLMParams = {
+    ..@prompt.LLMParams::default(),
+    tool_choice: Some(@prompt.Named("search")),
+  }
+  let p = @prompt.PromptBuilder::new(params~).user("find it").build()
+  let req = to_chat_request(p, @llm.deepseek_v4_flash, [])
+  assert_eq(req.tool_choice, Some(@moonllm.Function("search")))
+}
+
+///|
+test "to_chat_request leaves tool_choice and response_format unset by default" {
+  let p = @prompt.PromptBuilder::new().user("hi").build()
+  let req = to_chat_request(p, @llm.deepseek_v4_flash, [])
+  assert_true(req.tool_choice is None)
+  assert_true(req.response_format is None)
+}
+
+///|
 test "to_chat_request carries the model, messages, and tools" {
   let p = @prompt.PromptBuilder::new().system("be helpful").user("2+3?").build()
   let d : @tools.ToolDescriptor = {

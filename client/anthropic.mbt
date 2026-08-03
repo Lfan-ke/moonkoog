@@ -102,7 +102,25 @@ pub fn to_anthropic_request(
     }
     fields["tools"] = Json::array(arr)
   }
+  if prompt.params.tool_choice is Some(tc) {
+    fields["tool_choice"] = anthropic_tool_choice(tc)
+  }
+  // Anthropic's Messages API has no `response_format`; structured output is coaxed via a forced
+  // tool, so `params.schema` is left for that path rather than emitted here.
   Json::object(fields)
+}
+
+///|
+/// Map a Koog tool-choice to Anthropic's `tool_choice` object: `{type: auto|any|tool, name?}`,
+/// with `none` forbidding tools.
+fn anthropic_tool_choice(tc : @prompt.ToolChoice) -> Json {
+  match tc {
+    Auto => Json::object({ "type": Json::string("auto") })
+    NoTools => Json::object({ "type": Json::string("none") })
+    Required => Json::object({ "type": Json::string("any") })
+    Named(name) =>
+      Json::object({ "type": Json::string("tool"), "name": Json::string(name) })
+  }
 }
 
 ///|
