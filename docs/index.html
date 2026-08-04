@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>moonkoog</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #fbfbfd;
+    --fg: #1d1d21;
+    --muted: #5b5b66;
+    --line: #e6e6ec;
+    --card: #ffffff;
+    --accent: #dc2626;
+    --code-bg: #f2f2f6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e0e12;
+      --fg: #e9e9f0;
+      --muted: #9a9aa8;
+      --line: #26262e;
+      --card: #16161c;
+      --accent: #f87171;
+      --code-bg: #1b1b22;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.65 "HarmonyOS Sans SC", "Microsoft YaHei UI", system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 7vh 24px 12vh; }
+  .brand { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 2.6rem; margin: 0; letter-spacing: -0.02em; }
+  .ver { color: var(--muted); font-size: 0.95rem; font-variant-numeric: tabular-nums; }
+  .lede { font-size: 1.2rem; color: var(--fg); margin: 0.8rem 0 0; }
+  .sub { color: var(--muted); margin-top: 0.4rem; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; margin: 1.8rem 0 2.4rem; }
+  .btn {
+    display: inline-block; padding: 0.6rem 1.1rem; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--card); color: var(--fg);
+    font-weight: 550;
+  }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { text-decoration: none; opacity: 0.92; }
+  h2 { font-size: 1.15rem; margin: 2.4rem 0 0.8rem; letter-spacing: -0.01em; }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 12px;
+    padding: 1rem 1.1rem; overflow-x: auto; font-size: 0.9rem;
+    font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  }
+  code { font-family: "JetBrains Mono", ui-monospace, Consolas, monospace; }
+  table { width: 100%; border-collapse: collapse; margin-top: 0.6rem; font-size: 0.94rem; }
+  th, td { text-align: left; padding: 0.55rem 0.6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 550; }
+  td code { color: var(--fg); }
+  footer { margin-top: 3.4rem; padding-top: 1.4rem; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<main>
+  <div class="brand">
+    <h1>moonkoog</h1>
+    <span class="ver">0.2.0 · Apache-2.0</span>
+  </div>
+  <p class="lede">A MoonBit port of <a href="https://github.com/JetBrains/koog">JetBrains Koog</a> — a type-safe agent-orchestration framework.</p>
+  <p class="sub">A prompt/message model, an LLM-client contract, a tool registry with an explicit JSON-schema descriptor, and an <code>AIAgent</code> that drives the tool-calling loop. Part of the moon-heke full-stack suite.</p>
+
+  <div class="row">
+    <a class="btn primary" href="https://github.com/Lfan-ke/moonkoog#readme">Read the README</a>
+    <a class="btn" href="https://github.com/Lfan-ke/moonkoog">GitHub</a>
+    <a class="btn" href="https://github.com/Lfan-ke/moonkoog/tree/master/examples">Examples</a>
+  </div>
+
+  <h2>The core loop</h2>
+  <pre><code>let agent = @agent.AIAgent::new(
+  client,
+  model=@llm.deepseek_v4_flash,
+  tool_registry=@tools.ToolRegistry::new().add(Add::{}),
+)
+let answer = agent.run("what is 2 + 3?")</code></pre>
+
+  <h2>The chain</h2>
+  <table>
+    <thead><tr><th>Koog concern</th><th>moonkoog</th></tr></thead>
+    <tbody>
+      <tr><td>Message / Prompt / PromptBuilder</td><td><code>prompt/</code></td></tr>
+      <tr><td>LLModel / LLMProvider / LLMCapability</td><td><code>llm/</code></td></tr>
+      <tr><td>Tool / ToolDescriptor / ToolRegistry</td><td><code>tools/</code></td></tr>
+      <tr><td>LLMClient contract, AIAgent, singleRunStrategy</td><td><code>agent/</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2>Build</h2>
+  <pre><code>moon check --target all --deny-warn
+moon test --target all</code></pre>
+
+  <footer>
+    moonkoog tracks Koog 1.1.1 · full docs and roadmap in the
+    <a href="https://github.com/Lfan-ke/moonkoog#readme">README</a>.
+  </footer>
+</main>
+</body>
+</html>
