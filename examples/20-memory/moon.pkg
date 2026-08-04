@@ -1,0 +1,7 @@
+supported_targets = "native"
+
+import {
+  "Lfan-ke/moonkoog/memory",
+}
+
+pkgtype(kind: "executable")

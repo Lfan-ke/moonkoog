@@ -1,0 +1,11 @@
+supported_targets = "native"
+
+import {
+  "Lfan-ke/moonkoog/client",
+  "Lfan-ke/moonkoog/agent",
+  "Lfan-ke/moonkoog/prompt",
+  "Lfan-ke/moonkoog/llm",
+  "moonbitlang/core/json",
+}
+
+pkgtype(kind: "executable")

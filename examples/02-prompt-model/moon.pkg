@@ -1,0 +1,7 @@
+supported_targets = "native"
+
+import {
+  "Lfan-ke/moonkoog/prompt",
+}
+
+pkgtype(kind: "executable")

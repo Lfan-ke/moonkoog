@@ -1,0 +1,7 @@
+supported_targets = "native"
+
+import {
+  "Lfan-ke/moonkoog/llm",
+}
+
+pkgtype(kind: "executable")
