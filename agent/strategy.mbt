@@ -156,7 +156,7 @@ pub fn AIAgentStrategy::edge(
   condition? : EdgeCondition = Always,
   transform? : String? = None,
 ) -> AIAgentStrategy {
-  self.edges.push({ from, to, condition, transform })
+  self.edges.push({ from, to, condition, transform, })
   self
 }
 
@@ -463,6 +463,7 @@ pub async fn AIAgent::run_strategy(
   self : AIAgent,
   strategy : AIAgentStrategy,
   input : String,
+  stop? : RunHandle,
 ) -> String {
   let builder = @prompt.PromptBuilder::new()
   if self.system_prompt is Some(sp) {
@@ -481,6 +482,9 @@ pub async fn AIAgent::run_strategy(
   (self.events.on_agent_starting)(input)
   for step = 0, current = strategy.start, value = VText(input), llm_calls = 0; step <
      strategy.max_steps; {
+    if stop is Some(handle) && handle.stopping {
+      raise AgentStopped(node_value_text(value))
+    }
     guard strategy.nodes.get(current) is Some(kind) else {
       raise AgentError("strategy has no node named '" + current + "'")
     }

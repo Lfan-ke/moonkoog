@@ -1,0 +1,62 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "Lfan-ke/moonkoog/memory"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub let subject_everything : MemorySubject
+
+pub let subject_machine : MemorySubject
+
+pub let subject_organization : MemorySubject
+
+pub let subject_user : MemorySubject
+
+// Errors
+
+// Types and methods
+pub(all) struct Concept {
+  keyword : String
+  description : String
+  fact_type : FactType
+} derive(Eq, @debug.Debug)
+
+pub(all) enum Fact {
+  SingleFact(concept~ : Concept, value~ : String, timestamp~ : Int64)
+  MultipleFacts(concept~ : Concept, values~ : Array[String], timestamp~ : Int64)
+} derive(Eq, @debug.Debug)
+pub fn Fact::concept(Self) -> Concept
+
+pub(all) enum FactType {
+  Single
+  Multiple
+} derive(Eq, @debug.Debug)
+
+pub struct InMemoryProvider {
+  store : Map[String, Array[Fact]]
+}
+pub fn InMemoryProvider::new() -> Self
+pub impl MemoryProvider for InMemoryProvider
+
+pub(all) enum MemoryScope {
+  ScopeAgent(String)
+  ScopeFeature(String)
+  ScopeProduct
+  ScopeCrossProduct
+} derive(Eq, @debug.Debug)
+
+pub(all) struct MemorySubject {
+  name : String
+  priority : Int
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits
+pub(open) trait MemoryProvider {
+  fn save(Self, Fact, MemorySubject, MemoryScope) -> Unit
+  fn load(Self, Concept, MemorySubject, MemoryScope) -> Array[Fact]
+  fn load_all(Self, MemorySubject, MemoryScope) -> Array[Fact]
+}

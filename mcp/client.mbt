@@ -19,7 +19,7 @@ pub struct McpClient {
 ///|
 /// A client that talks to an MCP server through `transport`.
 pub fn McpClient::new(transport : &McpTransport) -> McpClient {
-  { transport, next_id: 1 }
+  { transport, next_id: 1, }
 }
 
 ///|

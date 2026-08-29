@@ -26,7 +26,7 @@ impl @a2a.AgentExecutor for EchoExecutor with fn cancel(_self, task_id) {
   {
     id: task_id,
     context_id: task_id,
-    status: { state: Canceled, message: None, timestamp: None },
+    status: { state: Canceled, message: None, timestamp: None, },
     history: None,
     artifacts: None,
     metadata: None,
@@ -47,7 +47,7 @@ impl @a2a.A2ATransport for LoopbackTransport with fn round_trip(self, request) {
 ///|
 test "a2a e2e: client ↔ server round-trip over the real JSON-RPC handler" {
   let store = @a2a.InMemoryTaskStore::new()
-  let server = @a2a.A2AServer::new(EchoExecutor::{  }, store)
+  let server = @a2a.A2AServer::new(EchoExecutor::{ }, store)
   let client = @a2a.A2AClient::new(LoopbackTransport::{ server, })
   let sent = client.send_message(@a2a.Message::user_text("m1", "hi"))
   let task = match sent {
@@ -65,7 +65,7 @@ test "a2a e2e: client ↔ server round-trip over the real JSON-RPC handler" {
 ///|
 test "a2a e2e: tasks/get for an unknown task returns a JSON-RPC error the client surfaces" {
   let store = @a2a.InMemoryTaskStore::new()
-  let server = @a2a.A2AServer::new(EchoExecutor::{  }, store)
+  let server = @a2a.A2AServer::new(EchoExecutor::{ }, store)
   let client = @a2a.A2AClient::new(LoopbackTransport::{ server, })
   let failed = try {
     client.get_task("nope") |> ignore

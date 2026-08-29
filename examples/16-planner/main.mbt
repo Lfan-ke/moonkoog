@@ -49,7 +49,7 @@ async fn main {
     // With the critic, the model's verdict keeps or replaces the plan.
     let sample : @agent.SimplePlan = {
       goal: "g",
-      steps: [{ description: "a", is_completed: false }],
+      steps: [{ description: "a", is_completed: false, }],
     }
     let keep = @agent.LLMPlanner::new(
       @agent.MockClient::new([@prompt.Message::assistant("CONTINUE")]),

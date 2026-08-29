@@ -40,7 +40,7 @@ async test "chat strategy: nudges on plain text, runs a tool, finishes on the ex
       finish_reason: None,
     }
     let mock = @agent.MockClient::new([plain, tool_call, exit_call])
-    let registry = @tools.ToolRegistry::new().add(GreetTool::{  })
+    let registry = @tools.ToolRegistry::new().add(GreetTool::{ })
     let agent = @agent.AIAgent::new(
       mock,
       model=@llm.deepseek_v4_flash,

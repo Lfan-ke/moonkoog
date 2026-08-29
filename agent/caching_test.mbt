@@ -47,7 +47,7 @@ impl @agent.LLMClient for CountingClient with fn execute_multiple(
 ///|
 async test "caching client: a repeated prompt is served from cache; a new prompt calls through" {
   @async.with_task_group(_g => {
-    let counter = CountingClient::{ calls: 0, reply: "cached-reply" }
+    let counter = CountingClient::{ calls: 0, reply: "cached-reply", }
     let client = @agent.CachingClient::new(counter)
     let model = @llm.deepseek_v4_flash
     let p1 = @prompt.PromptBuilder::new().user("hello").build()

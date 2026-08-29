@@ -18,7 +18,7 @@ fn anthropic_role(r : @prompt.Role) -> String {
 ///|
 /// The concatenated text of a message's `Text` parts.
 fn anthropic_text(m : @prompt.Message) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for part in m.parts {
     match part {
       Text(t) => sb.write_string(t)
@@ -174,7 +174,7 @@ pub fn from_anthropic_response(response : Json) -> @prompt.Message {
     }
     _ => ()
   }
-  { role: Assistant, parts, finish_reason: finish }
+  { role: Assistant, parts, finish_reason: finish, }
 }
 
 ///|

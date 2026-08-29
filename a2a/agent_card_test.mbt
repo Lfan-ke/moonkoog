@@ -21,10 +21,10 @@ test "a2a agent card: a full card round-trips, security/signatures preserved ver
     url: "https://agent/x",
     preferred_transport: "JSONRPC",
     additional_interfaces: Some([
-      { url: "https://agent/grpc", transport: "GRPC" },
+      { url: "https://agent/grpc", transport: "GRPC", },
     ]),
     icon_url: Some("https://agent/icon.png"),
-    provider: Some({ organization: "acme", url: "https://acme" }),
+    provider: Some({ organization: "acme", url: "https://acme", }),
     version: "1.2.3",
     documentation_url: None,
     capabilities: {

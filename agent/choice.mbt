@@ -20,7 +20,7 @@ pub struct FirstChoice {}
 ///|
 /// The first-choice selector.
 pub fn FirstChoice::new() -> FirstChoice {
-  FirstChoice::{  }
+  FirstChoice::{ }
 }
 
 ///|
@@ -50,7 +50,7 @@ pub fn LLMChoiceSelector::new(
   client : &LLMClient,
   model : @llm.LLModel,
 ) -> LLMChoiceSelector {
-  { client, model }
+  { client, model, }
 }
 
 ///|
@@ -60,7 +60,7 @@ pub impl ChoiceSelectionStrategy for LLMChoiceSelector with fn choose(
   choices,
 ) {
   guard choices.length() > 0 else { @prompt.Message::assistant("") }
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string(
     "Select the best of these candidate answers. Reply with only its number.\n",
   )

@@ -9,31 +9,31 @@ pub(all) struct LLMProvider {
 } derive(Eq, Debug)
 
 ///|
-pub let openai : LLMProvider = { id: "openai", display: "OpenAI" }
+pub let openai : LLMProvider = { id: "openai", display: "OpenAI", }
 
 ///|
-pub let anthropic : LLMProvider = { id: "anthropic", display: "Anthropic" }
+pub let anthropic : LLMProvider = { id: "anthropic", display: "Anthropic", }
 
 ///|
-pub let google : LLMProvider = { id: "google", display: "Google" }
+pub let google : LLMProvider = { id: "google", display: "Google", }
 
 ///|
-pub let deepseek : LLMProvider = { id: "deepseek", display: "DeepSeek" }
+pub let deepseek : LLMProvider = { id: "deepseek", display: "DeepSeek", }
 
 ///|
-pub let alibaba : LLMProvider = { id: "alibaba", display: "Alibaba" }
+pub let alibaba : LLMProvider = { id: "alibaba", display: "Alibaba", }
 
 ///|
-pub let meta : LLMProvider = { id: "meta", display: "Meta" }
+pub let meta : LLMProvider = { id: "meta", display: "Meta", }
 
 ///|
-pub let ollama : LLMProvider = { id: "ollama", display: "Ollama" }
+pub let ollama : LLMProvider = { id: "ollama", display: "Ollama", }
 
 ///|
-pub let openrouter : LLMProvider = { id: "openrouter", display: "OpenRouter" }
+pub let openrouter : LLMProvider = { id: "openrouter", display: "OpenRouter", }
 
 ///|
-pub let mistralai : LLMProvider = { id: "mistralai", display: "MistralAI" }
+pub let mistralai : LLMProvider = { id: "mistralai", display: "MistralAI", }
 
 ///|
 /// A capability a model may declare. Koog's `LLMCapability` is a sealed hierarchy;

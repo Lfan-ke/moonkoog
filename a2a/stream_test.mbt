@@ -28,9 +28,9 @@ test "sse codec: parses comments, event types, multi-line data, and a persisted 
     #|
   let events = @a2a.parse_sse(stream)
   assert_eq(events.length(), 3)
-  assert_eq(events[0], { event: "status", data: "{\"a\":1}", id: None })
-  assert_eq(events[1], { event: "message", data: "line1\nline2", id: None })
-  assert_eq(events[2], { event: "done", data: "bye", id: Some("42") })
+  assert_eq(events[0], { event: "status", data: "{\"a\":1}", id: None, })
+  assert_eq(events[1], { event: "message", data: "line1\nline2", id: None, })
+  assert_eq(events[2], { event: "done", data: "bye", id: Some("42"), })
 }
 
 ///|
@@ -66,7 +66,7 @@ test "a2a streaming: status-update and artifact-update events round-trip" {
   let status : @a2a.TaskStatusUpdateEvent = {
     task_id: "t",
     context_id: "c",
-    status: { state: Working, message: None, timestamp: None },
+    status: { state: Working, message: None, timestamp: None, },
     is_final: false,
     metadata: None,
   }

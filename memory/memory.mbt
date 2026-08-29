@@ -43,13 +43,16 @@ pub(all) struct MemorySubject {
 } derive(Eq, Debug)
 
 ///|
-pub let subject_everything : MemorySubject = { name: "everything", priority: 0 }
+pub let subject_everything : MemorySubject = {
+  name: "everything",
+  priority: 0,
+}
 
 ///|
-pub let subject_user : MemorySubject = { name: "user", priority: 1 }
+pub let subject_user : MemorySubject = { name: "user", priority: 1, }
 
 ///|
-pub let subject_machine : MemorySubject = { name: "machine", priority: 2 }
+pub let subject_machine : MemorySubject = { name: "machine", priority: 2, }
 
 ///|
 pub let subject_organization : MemorySubject = {
@@ -102,7 +105,7 @@ pub struct InMemoryProvider {
 ///|
 /// An empty in-memory provider.
 pub fn InMemoryProvider::new() -> InMemoryProvider {
-  { store: Map([]) }
+  { store: Map([]), }
 }
 
 ///|

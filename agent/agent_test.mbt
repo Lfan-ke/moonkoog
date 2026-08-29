@@ -8,8 +8,8 @@ impl @tools.Tool for AddTool with fn descriptor(_self) {
     name: "add",
     description: "add two integers a and b",
     required_parameters: [
-      { name: "a", description: "first addend", ptype: @tools.TInteger },
-      { name: "b", description: "second addend", ptype: @tools.TInteger },
+      { name: "a", description: "first addend", ptype: @tools.TInteger, },
+      { name: "b", description: "second addend", ptype: @tools.TInteger, },
     ],
     optional_parameters: [],
   }
@@ -101,9 +101,9 @@ impl @agent.LLMClient for LoopClient with fn execute_multiple(
 ///|
 async test "agent runs the singleRunStrategy loop end to end: request, execute tool, feed back, finish" {
   @async.with_task_group(_g => {
-    let registry = @tools.ToolRegistry::new().add(AddTool::{  })
+    let registry = @tools.ToolRegistry::new().add(AddTool::{ })
     let agent = @agent.AIAgent::new(
-      LoopClient::{  },
+      LoopClient::{ },
       model=@llm.deepseek_v4_flash,
       tool_registry=registry,
       system_prompt=Some("you can add"),

@@ -31,7 +31,7 @@ pub impl Embedder for MockEmbedder with fn embed(self, text) {
     let bucket = text[i].to_int() % self.dimension
     buckets[bucket] = buckets[bucket] + 1.0
   }
-  { values: buckets }
+  { values: buckets, }
 }
 
 ///|

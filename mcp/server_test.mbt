@@ -11,7 +11,7 @@ impl @tools.Tool for EchoTool with fn descriptor(_self) {
     name: "echo",
     description: "echoes text back",
     required_parameters: [
-      { name: "text", description: "the text to echo", ptype: TString },
+      { name: "text", description: "the text to echo", ptype: TString, },
     ],
     optional_parameters: [],
   }
@@ -42,7 +42,7 @@ impl @mcp.McpTransport for ServerLoopback with fn round_trip(self, request) {
 
 ///|
 test "mcp e2e: a client discovers and calls the server's tools over the real protocol" {
-  let registry = @tools.ToolRegistry::new().add(EchoTool::{  })
+  let registry = @tools.ToolRegistry::new().add(EchoTool::{ })
   let client = @mcp.McpClient::new(ServerLoopback::{
     server: @mcp.McpServer::new(registry),
   })

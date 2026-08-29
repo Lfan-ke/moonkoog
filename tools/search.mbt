@@ -22,8 +22,12 @@ pub impl Tool for RegexSearchTool with fn descriptor(_self) {
     name: "search_files",
     description: "Search the files under a directory for a regular-expression pattern.",
     required_parameters: [
-      { name: "path", description: "the directory to search", ptype: TString },
-      { name: "pattern", description: "the regular expression", ptype: TString },
+      { name: "path", description: "the directory to search", ptype: TString, },
+      {
+        name: "pattern",
+        description: "the regular expression",
+        ptype: TString,
+      },
     ],
     optional_parameters: [],
   }
@@ -32,7 +36,7 @@ pub impl Tool for RegexSearchTool with fn descriptor(_self) {
 ///|
 pub impl Tool for RegexSearchTool with fn execute_raw(self, args) {
   let regex = @string.Regex::Regex(arg_string(args, "pattern"))
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   for file in self.fs.list(arg_string(args, "path")) {
     if self.fs.read(file) is Some(content) && regex.execute(content) is Some(_) {
       out.write_string(file + "\n")

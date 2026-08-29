@@ -18,7 +18,7 @@ pub struct MultiLLMClient {
 pub fn MultiLLMClient::new(
   default_provider? : @llm.LLMProvider = @llm.openai,
 ) -> MultiLLMClient {
-  { clients: Map([]), fallback: None, default_provider }
+  { clients: Map([]), fallback: None, default_provider, }
 }
 
 ///|

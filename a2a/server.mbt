@@ -38,7 +38,7 @@ pub struct InMemoryTaskStore {
 ///|
 /// A fresh in-memory store.
 pub fn InMemoryTaskStore::new() -> InMemoryTaskStore {
-  { tasks: Map([]) }
+  { tasks: Map([]), }
 }
 
 ///|
@@ -66,7 +66,7 @@ pub fn A2AServer::new(
   executor : &AgentExecutor,
   store : &TaskStore,
 ) -> A2AServer {
-  { executor, store, push: Map([]) }
+  { executor, store, push: Map([]), }
 }
 
 ///|
@@ -126,7 +126,7 @@ fn A2AServer::dispatch(
         None => None
       }
       match
-        self.executor.execute({ message, task_id, context_id, task: existing }) {
+        self.executor.execute({ message, task_id, context_id, task: existing, }) {
         ResultTask(task) => {
           self.store.save(task)
           task.to_json()

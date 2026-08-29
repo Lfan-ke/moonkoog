@@ -6,9 +6,9 @@
 /// the whole wiring ran, not that a canned string came back.
 async test "run_strategy with single_run_strategy runs the full tool loop" {
   @async.with_task_group(_g => {
-    let registry = @tools.ToolRegistry::new().add(AddTool::{  })
+    let registry = @tools.ToolRegistry::new().add(AddTool::{ })
     let agent = @agent.AIAgent::new(
-      LoopClient::{  },
+      LoopClient::{ },
       model=@llm.deepseek_v4_flash,
       tool_registry=registry,
       system_prompt=Some("you can add"),
@@ -46,9 +46,9 @@ async test "a custom strategy graph wires start -> llm -> finish" {
 /// only an assistant-message edge out of the LLM node.
 async test "run_strategy raises when no outgoing edge matches" {
   @async.with_task_group(_g => {
-    let registry = @tools.ToolRegistry::new().add(AddTool::{  })
+    let registry = @tools.ToolRegistry::new().add(AddTool::{ })
     let agent = @agent.AIAgent::new(
-      LoopClient::{  },
+      LoopClient::{ },
       model=@llm.deepseek_v4_flash,
       tool_registry=registry,
     )
@@ -64,5 +64,45 @@ async test "run_strategy raises when no outgoing edge matches" {
       _ => "unexpected error kind"
     }
     assert_eq(msg.contains("no edge out of"), true)
+  })
+}
+
+///|
+/// A run that is asked to stop finishes the node it is in and stops at the next
+/// boundary, rather than being cut off mid-node: the custom node that calls `stop`
+/// still returns its own value, that value comes back on `AgentStopped`, and the
+/// node after it never runs.
+async test "a stopped run finishes its current node and goes no further" {
+  @async.with_task_group(_g => {
+    let agent = @agent.AIAgent::new(
+      LoopClient::{ },
+      model=@llm.deepseek_v4_flash,
+    )
+    let handle = @agent.RunHandle::new()
+    let visited : Array[String] = []
+    let strategy = @agent.AIAgentStrategy::new("stoppable")
+      .custom_node("halt", (_session, _v) => {
+        visited.push("halt")
+        handle.stop()
+        @agent.VText("hhh")
+      })
+      .custom_node("after", (_session, v) => {
+        visited.push("after")
+        v
+      })
+      .edge(@agent.start_node, "halt")
+      .edge("halt", "after")
+      .edge("after", @agent.finish_node)
+    let msg = try {
+      agent.run_strategy(strategy, "qwq", stop=handle) |> ignore
+      "NO RAISE"
+    } catch {
+      @agent.AgentStopped(partial) => partial
+      @agent.AgentError(m) => "wrong error: " + m
+      _ => "unexpected error kind"
+    }
+    assert_eq(msg, "hhh")
+    assert_eq(visited, ["halt"])
+    assert_eq(handle.stopping(), true)
   })
 }

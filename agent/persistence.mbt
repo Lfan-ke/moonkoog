@@ -36,7 +36,7 @@ pub struct InMemoryPersistence {
 ///|
 /// A fresh empty persistence store.
 pub fn InMemoryPersistence::new() -> InMemoryPersistence {
-  { by_session: {} }
+  { by_session: {}, }
 }
 
 ///|

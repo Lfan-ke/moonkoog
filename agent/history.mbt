@@ -23,7 +23,7 @@ pub fn HistoryCompressor::new(
   client : &LLMClient,
   model : @llm.LLModel,
 ) -> HistoryCompressor {
-  { client, model }
+  { client, model, }
 }
 
 ///|
@@ -58,7 +58,7 @@ async fn HistoryCompressor::summarize(
   self : HistoryCompressor,
   messages : Array[@prompt.Message],
 ) -> @prompt.Message {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string("Summarize this conversation into a brief TLDR:\n")
   for m in messages {
     sb.write_string(m.text_content())

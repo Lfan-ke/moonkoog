@@ -8,9 +8,9 @@ test "llm embedder: diff is the cosine distance between embeddings" {
     base_url="https://api.openai.com/v1",
     model="text-embedding-3-small",
   )
-  let a : @embeddings.Vector = { values: [1.0, 0.0] }
-  let identical : @embeddings.Vector = { values: [1.0, 0.0] }
-  let orthogonal : @embeddings.Vector = { values: [0.0, 1.0] }
+  let a : @embeddings.Vector = { values: [1.0, 0.0], }
+  let identical : @embeddings.Vector = { values: [1.0, 0.0], }
+  let orthogonal : @embeddings.Vector = { values: [0.0, 1.0], }
   // Identical embeddings → cosine 1 → distance 0.
   assert_eq(embedder.diff(a, identical) < 1.0e-9, true)
   // Orthogonal embeddings → cosine 0 → distance 1.

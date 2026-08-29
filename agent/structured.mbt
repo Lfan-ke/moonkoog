@@ -111,7 +111,7 @@ pub async fn[T] AIAgent::request_structured(
       None
     }
     if parsed is Some(value) {
-      return { value, raw: text }
+      return { value, raw: text, }
     }
     prompt = prompt.append(reply)
     prompt = prompt.append(

@@ -42,7 +42,7 @@ pub fn parse_tool(tool : Json) -> @tools.ToolDescriptor raise {
       optional_parameters.push(p)
     }
   }
-  { name, description, required_parameters, optional_parameters }
+  { name, description, required_parameters, optional_parameters, }
 }
 
 ///|
@@ -70,7 +70,7 @@ fn parse_parameters(
       raise McpError("parameter " + name + " must be a JSON object")
     }
     let description = str_field(el, "description", "")
-    out.push({ name, description, ptype: parse_type(el, defs, 0) })
+    out.push({ name, description, ptype: parse_type(el, defs, 0), })
   }
   out
 }
@@ -132,8 +132,8 @@ fn parse_type(
   // A type-array containing "null" (e.g. ["integer","null"]) is a nullable union.
   if nullable_array && parsed != TNull {
     TAnyOf([
-      { name: "", description: "", ptype: TNull },
-      { name: "", description: "", ptype: parsed },
+      { name: "", description: "", ptype: TNull, },
+      { name: "", description: "", ptype: parsed, },
     ])
   } else {
     parsed
@@ -250,7 +250,7 @@ fn str_array_field(obj : Map[String, Json], key : String) -> Array[String] {
 ///|
 /// `s` lowercased over ASCII `A`–`Z` (Koog lowercases the type keyword defensively).
 fn ascii_lower(s : String) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for c in s {
     let code = c.to_int()
     if code >= 'A'.to_int() && code <= 'Z'.to_int() {
@@ -279,7 +279,7 @@ fn strip_prefix(s : String, prefix : String) -> String {
 ///|
 /// `s` with its first `n` characters dropped.
 fn drop_n(s : String, n : Int) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   let mut i = 0
   for c in s {
     if i >= n {
@@ -294,7 +294,7 @@ fn drop_n(s : String, n : Int) -> String {
 /// `s` split on `/`.
 fn split_slash(s : String) -> Array[String] {
   let out : Array[String] = []
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for c in s {
     if c == '/' {
       out.push(sb.to_string())

@@ -19,7 +19,7 @@ pub fn[Doc] EmbeddingStorage::new(
   embedder : &@embeddings.Embedder,
   to_text : (Doc) -> String,
 ) -> EmbeddingStorage[Doc] {
-  { embedder, to_text, store: VectorStore::new() }
+  { embedder, to_text, store: VectorStore::new(), }
 }
 
 ///|

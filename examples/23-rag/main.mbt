@@ -33,12 +33,12 @@ async fn main {
     println("after delete: size=\{storage.size()}")
 
     // The ranking primitive over pre-computed vectors.
-    let query : @embeddings.Vector = { values: [1.0, 0.0] }
+    let query : @embeddings.Vector = { values: [1.0, 0.0], }
     let docs : Array[(String, @embeddings.Vector)] = [
-      ("same", { values: [1.0, 0.0] }),
-      ("orthogonal", { values: [0.0, 1.0] }),
-      ("near", { values: [1.0, 0.5] }),
-      ("opposite", { values: [-1.0, 0.0] }),
+      ("same", { values: [1.0, 0.0], }),
+      ("orthogonal", { values: [0.0, 1.0], }),
+      ("near", { values: [1.0, 0.5], }),
+      ("opposite", { values: [-1.0, 0.0], }),
     ]
     try {
       // Default min_score 0.0 drops the negative-cosine document.
@@ -56,8 +56,8 @@ async fn main {
 
     // The raw index: store/get/delete/size over (doc, vector) pairs.
     let index : @rag.VectorStore[String] = @rag.VectorStore::new()
-    let d0 = index.store("hello", { values: [1.0, 0.0] })
-    let _ = index.store("world", { values: [0.0, 1.0] })
+    let d0 = index.store("hello", { values: [1.0, 0.0], })
+    let _ = index.store("world", { values: [0.0, 1.0], })
     println("VectorStore: first id=" + d0 + ", size=\{index.size()}")
     let _ = index.delete(d0)
     println("after delete(\{d0}): size=\{index.size()}")

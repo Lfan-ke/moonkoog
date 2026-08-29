@@ -11,8 +11,8 @@ fn assert_close(a : Double, b : Double) -> Unit {
 ///|
 test "vector store: store, get, delete, size" {
   let store : VectorStore[String] = VectorStore::new()
-  let id0 = store.store("hello", { values: [1.0, 0.0] })
-  let id1 = store.store("world", { values: [0.0, 1.0] })
+  let id0 = store.store("hello", { values: [1.0, 0.0], })
+  let id1 = store.store("world", { values: [0.0, 1.0], })
   assert_eq(id0, "doc-0")
   assert_eq(id1, "doc-1")
   assert_eq(store.size(), 2)
@@ -25,12 +25,12 @@ test "vector store: store, get, delete, size" {
 
 ///|
 test "rag: rank_by_similarity orders by cosine similarity and honours min_score / limit / offset" {
-  let query : @embeddings.Vector = { values: [1.0, 0.0] }
+  let query : @embeddings.Vector = { values: [1.0, 0.0], }
   let docs : Array[(String, @embeddings.Vector)] = [
-    ("same", { values: [1.0, 0.0] }), // cosine 1
-    ("orth", { values: [0.0, 1.0] }), // cosine 0
-    ("near", { values: [1.0, 0.5] }), // cosine ≈ 0.894
-    ("opp", { values: [-1.0, 0.0] }), // cosine -1
+    ("same", { values: [1.0, 0.0], }), // cosine 1
+    ("orth", { values: [0.0, 1.0], }), // cosine 0
+    ("near", { values: [1.0, 0.5], }), // cosine ≈ 0.894
+    ("opp", { values: [-1.0, 0.0], }), // cosine -1
   ]
   // Full ranking (min_score below -1 keeps everything), descending by score.
   let ranked = rank_by_similarity(query, docs, min_score=-2.0)

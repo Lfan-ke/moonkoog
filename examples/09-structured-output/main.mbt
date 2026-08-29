@@ -12,7 +12,7 @@ fn parse_person(j : Json) -> Person? {
   guard j is Object(m) else { return None }
   guard m.get("name") is Some(String(name)) else { return None }
   guard m.get("age") is Some(Number(age, ..)) else { return None }
-  Some({ name, age: age.to_int() })
+  Some({ name, age: age.to_int(), })
 }
 
 ///|
@@ -22,8 +22,8 @@ fn person_schema() -> @agent.StructuredSchema[Person] {
     description: "a person with a name and age",
     schema: @tools.TObject(
       properties=[
-        { name: "name", description: "full name", ptype: @tools.TString },
-        { name: "age", description: "age in years", ptype: @tools.TInteger },
+        { name: "name", description: "full name", ptype: @tools.TString, },
+        { name: "age", description: "age in years", ptype: @tools.TInteger, },
       ],
       required=["name", "age"],
     ),

@@ -85,7 +85,7 @@ test "a2a client: message/send resolves a Task, tasks/get and tasks/cancel retur
   let working_task : @a2a.Task = {
     id: "t9",
     context_id: "c9",
-    status: { state: Working, message: None, timestamp: None },
+    status: { state: Working, message: None, timestamp: None, },
     history: None,
     artifacts: None,
     metadata: None,

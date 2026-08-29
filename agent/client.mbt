@@ -74,7 +74,7 @@ pub fn MockClient::new(
   scripted : Array[@prompt.Message],
   provider? : @llm.LLMProvider = @llm.openai,
 ) -> MockClient {
-  { scripted, next: 0, provider_id: provider }
+  { scripted, next: 0, provider_id: provider, }
 }
 
 ///|

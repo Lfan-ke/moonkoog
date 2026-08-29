@@ -8,8 +8,8 @@ impl @tools.Tool for Add with fn descriptor(_self) {
     name: "add",
     description: "add two integers a and b",
     required_parameters: [
-      { name: "a", description: "first addend", ptype: @tools.TInteger },
-      { name: "b", description: "second addend", ptype: @tools.TInteger },
+      { name: "a", description: "first addend", ptype: @tools.TInteger, },
+      { name: "b", description: "second addend", ptype: @tools.TInteger, },
     ],
     optional_parameters: [],
   }
@@ -118,9 +118,9 @@ async fn main {
         trace.push("tool-result " + tool + " => " + result)
       })
     let agent = @agent.AIAgent::new(
-      LoopClient::{  },
+      LoopClient::{ },
       model=@llm.deepseek_v4_flash,
-      tool_registry=@tools.ToolRegistry::new().add(Add::{  }),
+      tool_registry=@tools.ToolRegistry::new().add(Add::{ }),
       system_prompt=Some("you can add integers"),
       events~,
     )

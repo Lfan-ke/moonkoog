@@ -41,13 +41,13 @@ pub struct LLMPlanner {
 ///|
 /// A planner over `client` / `model` that keeps its plan once built.
 pub fn LLMPlanner::new(client : &LLMClient, model : @llm.LLModel) -> LLMPlanner {
-  { client, model, with_critic: false }
+  { client, model, with_critic: false, }
 }
 
 ///|
 /// The same planner with the LLM critic enabled (Koog `Planners.llmBasedWithCritic`).
 pub fn LLMPlanner::with_critic(self : LLMPlanner) -> LLMPlanner {
-  { ..self, with_critic: true }
+  { ..self, with_critic: true, }
 }
 
 ///|
@@ -88,7 +88,7 @@ pub async fn LLMPlanner::build_plan(
   if assessment is Continue(p) {
     return p
   }
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string(
     "You are a planning agent. Create a detailed, ordered plan of steps that solves the user's problem.\n",
   )
@@ -186,7 +186,7 @@ fn first_incomplete(plan : SimplePlan) -> PlanStep? {
 ///|
 /// Render a plan back into the line protocol, for feeding a failed plan to a replan prompt.
 fn render_plan(plan : SimplePlan) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string("GOAL: ")
   sb.write_string(plan.goal)
   sb.write_string("\n")
@@ -212,11 +212,11 @@ fn parse_plan(text : String) -> SimplePlan {
       let (completed, body) = strip_completed(trim_spaces(drop_n(t, 2)))
       let d = trim_spaces(body)
       if d != "" {
-        steps.push({ description: d, is_completed: completed })
+        steps.push({ description: d, is_completed: completed, })
       }
     }
   }
-  { goal, steps }
+  { goal, steps, }
 }
 
 ///|
@@ -236,7 +236,7 @@ fn strip_completed(body : String) -> (Bool, String) {
 ///|
 /// The text with its first `n` characters dropped.
 fn drop_n(s : String, n : Int) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   let mut i = 0
   for c in s {
     if i >= n {
@@ -251,7 +251,7 @@ fn drop_n(s : String, n : Int) -> String {
 /// `s` split on newlines, carriage returns dropped.
 fn split_lines(s : String) -> Array[String] {
   let out : Array[String] = []
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for c in s {
     if c == '\n' {
       out.push(sb.to_string())
@@ -279,7 +279,7 @@ fn trim_spaces(s : String) -> String {
   while end > start && (chars[end - 1] == ' ' || chars[end - 1] == '\t') {
     end = end - 1
   }
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for i in start..<end {
     sb.write_string(chars[i].to_string())
   }

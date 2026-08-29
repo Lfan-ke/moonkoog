@@ -56,7 +56,7 @@ impl @agent.LLMClient for FlakyClient with fn execute_multiple(
 ///|
 async test "retrying client: retries a transient failure and eventually succeeds" {
   @async.with_task_group(_g => {
-    let flaky = FlakyClient::{ calls: 0, fail_times: 2 }
+    let flaky = FlakyClient::{ calls: 0, fail_times: 2, }
     let client = @agent.RetryingClient::new(flaky, max_attempts=3)
     let prompt = @prompt.PromptBuilder::new().user("hi").build()
     let reply = @agent.LLMClient::execute(
@@ -73,7 +73,7 @@ async test "retrying client: retries a transient failure and eventually succeeds
 ///|
 async test "retrying client: gives up after max_attempts" {
   @async.with_task_group(_g => {
-    let flaky = FlakyClient::{ calls: 0, fail_times: 5 }
+    let flaky = FlakyClient::{ calls: 0, fail_times: 5, }
     let client = @agent.RetryingClient::new(flaky, max_attempts=2)
     let prompt = @prompt.PromptBuilder::new().user("hi").build()
     let failed = try {

@@ -27,7 +27,7 @@ pub struct A2AClient {
 ///|
 /// A client talking to the agent behind `transport`.
 pub fn A2AClient::new(transport : &A2ATransport) -> A2AClient {
-  { transport, next_id: 1 }
+  { transport, next_id: 1, }
 }
 
 ///|

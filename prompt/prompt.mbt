@@ -67,7 +67,7 @@ pub(all) struct Prompt {
 /// A copy of this prompt with `message` appended — the immutable-append the agent
 /// loop uses to grow the conversation without mutating a shared value.
 pub fn Prompt::append(self : Prompt, message : Message) -> Prompt {
-  { ..self, messages: [..self.messages, message] }
+  { ..self, messages: [..self.messages, message], }
 }
 
 ///|
@@ -86,7 +86,7 @@ pub fn PromptBuilder::new(
   id? : String = "prompt",
   params? : LLMParams = LLMParams::default(),
 ) -> PromptBuilder {
-  { messages: [], id, params }
+  { messages: [], id, params, }
 }
 
 ///|
@@ -160,5 +160,5 @@ pub fn PromptBuilder::params(
 ///|
 /// Finish building.
 pub fn PromptBuilder::build(self : PromptBuilder) -> Prompt {
-  { messages: self.messages, id: self.id, params: self.params }
+  { messages: self.messages, id: self.id, params: self.params, }
 }

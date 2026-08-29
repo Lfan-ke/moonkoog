@@ -21,7 +21,7 @@ test "a2a push config: the model round-trips through its wire form" {
 ///|
 test "a2a push config e2e: set, get, list, delete over the server" {
   let server = @a2a.A2AServer::new(
-    EchoExecutor::{  },
+    EchoExecutor::{ },
     @a2a.InMemoryTaskStore::new(),
   )
   let client = @a2a.A2AClient::new(LoopbackTransport::{ server, })

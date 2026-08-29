@@ -1,0 +1,37 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "Lfan-ke/moonkoog/persistence"
+
+import {
+  "Lfan-ke/moonkoog/prompt",
+  "moonbitlang/core/debug",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub(all) struct AgentCheckpoint {
+  checkpoint_id : String
+  created_at : Int64
+  message_history : Array[@prompt.Message]
+  node_id : String?
+  last_input : String?
+  agent_iterations : Int
+  version : Int64
+} derive(Eq, @debug.Debug)
+
+pub struct InMemoryPersistence {
+  by_session : Map[String, Array[AgentCheckpoint]]
+}
+pub fn InMemoryPersistence::new() -> Self
+pub impl PersistenceStorageProvider for InMemoryPersistence
+
+// Type aliases
+
+// Traits
+pub(open) trait PersistenceStorageProvider {
+  fn save_checkpoint(Self, String, AgentCheckpoint) -> Unit
+  fn get_checkpoints(Self, String) -> Array[AgentCheckpoint]
+  fn get_latest_checkpoint(Self, String) -> AgentCheckpoint?
+}

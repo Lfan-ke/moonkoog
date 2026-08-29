@@ -14,7 +14,7 @@ pub struct AgentStorage {
 ///|
 /// A fresh empty store.
 pub fn AgentStorage::new() -> AgentStorage {
-  { entries: {} }
+  { entries: {}, }
 }
 
 ///|

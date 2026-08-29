@@ -7,7 +7,7 @@ impl @a2a.AgentExecutor for Echo with fn execute(_self, ctx) {
   @a2a.ResultTask({
     id: ctx.task_id,
     context_id: ctx.context_id,
-    status: { state: Completed, message: Some(ctx.message), timestamp: None },
+    status: { state: Completed, message: Some(ctx.message), timestamp: None, },
     history: None,
     artifacts: None,
     metadata: None,
@@ -19,7 +19,7 @@ impl @a2a.AgentExecutor for Echo with fn cancel(_self, task_id) {
   {
     id: task_id,
     context_id: task_id,
-    status: { state: Canceled, message: None, timestamp: None },
+    status: { state: Canceled, message: None, timestamp: None, },
     history: None,
     artifacts: None,
     metadata: None,
@@ -69,7 +69,7 @@ fn show_stream_event(ev : @a2a.StreamEvent) -> String {
 ///     moon run examples/25-a2a-protocol --target native
 #coverage.skip
 fn main {
-  let server = @a2a.A2AServer::new(Echo::{  }, @a2a.InMemoryTaskStore::new())
+  let server = @a2a.A2AServer::new(Echo::{ }, @a2a.InMemoryTaskStore::new())
   let client = @a2a.A2AClient::new(Loopback::{ server, })
   try {
     // message/send resolves to a completed task, which the store persists.

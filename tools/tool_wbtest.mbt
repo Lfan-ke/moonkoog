@@ -8,8 +8,8 @@ impl Tool for AddTool with fn descriptor(_self) {
     name: "add",
     description: "add two integers a and b",
     required_parameters: [
-      { name: "a", description: "first addend", ptype: TInteger },
-      { name: "b", description: "second addend", ptype: TInteger },
+      { name: "a", description: "first addend", ptype: TInteger, },
+      { name: "b", description: "second addend", ptype: TInteger, },
     ],
     optional_parameters: [],
   }
@@ -34,7 +34,7 @@ fn json_int(j : Json, key : String) -> Int {
 
 ///|
 test "a registered tool advertises its descriptor and runs on JSON args" {
-  let reg = ToolRegistry::new().add(AddTool::{  })
+  let reg = ToolRegistry::new().add(AddTool::{ })
   assert_eq(reg.descriptors().length(), 1)
   let d = reg.descriptors()[0]
   assert_eq(d.name, "add")
@@ -51,13 +51,13 @@ test "a registered tool advertises its descriptor and runs on JSON args" {
 ///|
 test "nested parameter types round-trip through Eq/Debug" {
   let t : ToolParameterType = TObject(
-    properties=[{ name: "xs", description: "a list", ptype: TList(TString) }],
+    properties=[{ name: "xs", description: "a list", ptype: TList(TString), }],
     required=["xs"],
   )
   assert_eq(
     t,
     TObject(
-      properties=[{ name: "xs", description: "a list", ptype: TList(TString) }],
+      properties=[{ name: "xs", description: "a list", ptype: TList(TString), }],
       required=["xs"],
     ),
   )

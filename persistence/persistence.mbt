@@ -38,7 +38,7 @@ pub struct InMemoryPersistence {
 ///|
 /// An empty in-memory checkpoint store.
 pub fn InMemoryPersistence::new() -> InMemoryPersistence {
-  { by_session: Map([]) }
+  { by_session: Map([]), }
 }
 
 ///|

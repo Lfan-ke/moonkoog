@@ -31,7 +31,9 @@ impl @agent.LLMClient for FlaggingClient with fn moderate(
   let _ = model
   @agent.ModerationResult::{
     is_harmful: true,
-    categories: { "violence": { detected: true, confidence_score: Some(0.92) } },
+    categories: {
+      "violence": { detected: true, confidence_score: Some(0.92), },
+    },
   }
 }
 
@@ -54,7 +56,7 @@ async test "moderation: the default reports nothing harmful; a client can flag c
     assert_eq(safe.is_harmful, false)
     assert_eq(safe.is_category_detected("violence"), false)
     // A moderation-capable client flags the categories its provider detected.
-    let flagging : &@agent.LLMClient = FlaggingClient::{  }
+    let flagging : &@agent.LLMClient = FlaggingClient::{ }
     let flagged = flagging.moderate(
       prompt=one_prompt(),
       model=model_for(@llm.openai),

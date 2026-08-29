@@ -3,9 +3,9 @@
 
 ///|
 async test "mock embedder: deterministic embedding and cosine-distance diff" {
-  let same : Ref[Bool] = { val: false }
-  let dim : Ref[Int] = { val: 0 }
-  let diff : Ref[Double] = { val: 1.0 }
+  let same : Ref[Bool] = { val: false, }
+  let dim : Ref[Int] = { val: 0, }
+  let diff : Ref[Double] = { val: 1.0, }
   @async.with_task_group(g => {
     let _ = g.spawn(() => {
       let embedder = @embeddings.MockEmbedder::new()

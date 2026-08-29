@@ -18,7 +18,7 @@ pub fn McpTool::new(
   client : McpClient,
   desc : @tools.ToolDescriptor,
 ) -> McpTool {
-  { client, desc }
+  { client, desc, }
 }
 
 ///|
@@ -72,7 +72,7 @@ fn strip_meta(o : Map[String, Json]) -> Json {
 ///|
 /// Join `parts` with newlines.
 fn join_newline(parts : Array[String]) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for i, p in parts {
     if i > 0 {
       sb.write_string("\n")

@@ -14,7 +14,7 @@ pub struct CachingClient {
 ///|
 /// Wrap `inner` with an in-memory reply cache.
 pub fn CachingClient::new(inner : &LLMClient) -> CachingClient {
-  { inner, cache: Map([]) }
+  { inner, cache: Map([]), }
 }
 
 ///|
@@ -27,7 +27,7 @@ pub fn CachingClient::size(self : CachingClient) -> Int {
 /// A cache key that captures the request: the model id followed by each message's role tag
 /// and text, so different prompts (or the same prompt to a different model) miss.
 fn caching_key(prompt : @prompt.Prompt, model : @llm.LLModel) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   sb.write_string(model.id)
   for m in prompt.messages {
     sb.write_string("\n")

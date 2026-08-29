@@ -36,7 +36,7 @@ pub struct VectorStore[Doc] {
 ///|
 /// A fresh empty store.
 pub fn[Doc] VectorStore::new() -> VectorStore[Doc] {
-  { next_id: 0, entries: {} }
+  { next_id: 0, entries: {}, }
 }
 
 ///|
@@ -107,7 +107,10 @@ pub fn[Doc] rank_by_similarity(
   for pair in documents {
     let value = query.cosine_similarity(pair.1)
     if value >= min_score {
-      hits.push({ document: pair.0, score: { value, metric: CosineSimilarity } })
+      hits.push({
+        document: pair.0,
+        score: { value, metric: CosineSimilarity, },
+      })
     }
   }
   // Insertion sort, score descending (stable: equal scores keep their insertion order).

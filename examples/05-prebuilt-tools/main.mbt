@@ -21,7 +21,7 @@ fn main {
   let read : &@tools.Tool = @tools.ReadFileTool::new(fs)
   let list : &@tools.Tool = @tools.ListDirectoryTool::new(fs)
   let search : &@tools.Tool = @tools.RegexSearchTool::new(fs)
-  let shell : &@tools.Tool = @tools.ExecuteShellCommandTool::new(FakeShell::{  })
+  let shell : &@tools.Tool = @tools.ExecuteShellCommandTool::new(FakeShell::{ })
   let exit : &@tools.Tool = @tools.ExitTool::new()
   let say : &@tools.Tool = @tools.SayToUser::new(msg => {
     println("  [user sees] " + msg)

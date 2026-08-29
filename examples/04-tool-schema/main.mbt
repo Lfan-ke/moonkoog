@@ -9,7 +9,11 @@ impl @tools.Tool for Search with fn descriptor(_self) {
     name: "search",
     description: "search a corpus with filters",
     required_parameters: [
-      { name: "query", description: "the search string", ptype: @tools.TString },
+      {
+        name: "query",
+        description: "the search string",
+        ptype: @tools.TString,
+      },
     ],
     optional_parameters: [
       {
@@ -40,8 +44,8 @@ impl @tools.Tool for Search with fn descriptor(_self) {
         name: "score",
         description: "either a float threshold or the literal null",
         ptype: @tools.TAnyOf([
-          { name: "", description: "", ptype: @tools.TFloat },
-          { name: "", description: "", ptype: @tools.TNull },
+          { name: "", description: "", ptype: @tools.TFloat, },
+          { name: "", description: "", ptype: @tools.TNull, },
         ]),
       },
       {
@@ -74,8 +78,8 @@ fn main {
     (
       "anyOf",
       @tools.TAnyOf([
-        { name: "", description: "", ptype: @tools.TString },
-        { name: "", description: "", ptype: @tools.TNull },
+        { name: "", description: "", ptype: @tools.TString, },
+        { name: "", description: "", ptype: @tools.TNull, },
       ]),
     ),
   ]
@@ -85,7 +89,7 @@ fn main {
   }
 
   // The whole tool as one input schema.
-  let registry = @tools.ToolRegistry::new().add(Search::{  })
+  let registry = @tools.ToolRegistry::new().add(Search::{ })
   let descriptors = registry.descriptors()
   println("registry holds \{descriptors.length()} tool(s)")
   let search = descriptors[0]

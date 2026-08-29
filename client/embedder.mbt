@@ -20,14 +20,14 @@ pub fn LLMEmbedder::new(
   model~ : String,
   timeout_ms? : Int = 60000,
 ) -> LLMEmbedder {
-  { inner: @moonllm.Client::new(api_key, base_url~, timeout_ms~), model }
+  { inner: @moonllm.Client::new(api_key, base_url~, timeout_ms~), model, }
 }
 
 ///|
 pub impl @embeddings.Embedder for LLMEmbedder with fn embed(self, text) {
   let request = @moonllm.EmbeddingRequest::of_text(self.model, text)
   let response = self.inner.embeddings(request)
-  { values: response.vector() }
+  { values: response.vector(), }
 }
 
 ///|

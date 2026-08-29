@@ -37,7 +37,7 @@ impl @tools.Tool for Weather with fn execute_raw(_, _args) {
 ///     moon run examples/01-prompt-to-wire --target native
 #coverage.skip
 fn main {
-  let registry = @tools.ToolRegistry::new().add(Weather::{  })
+  let registry = @tools.ToolRegistry::new().add(Weather::{ })
   let params : @prompt.LLMParams = {
     ..@prompt.LLMParams::default(),
     temperature: Some(0.2),

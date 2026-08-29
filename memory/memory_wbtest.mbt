@@ -1,7 +1,7 @@
 ///|
 /// A single-fact concept for the user's name.
 fn user_name() -> Concept {
-  { keyword: "user_name", description: "the user's name", fact_type: Single }
+  { keyword: "user_name", description: "the user's name", fact_type: Single, }
 }
 
 ///|

@@ -8,7 +8,7 @@ impl @tools.Tool for EchoTool with fn descriptor(_self) {
     name: "echo",
     description: "echoes text back",
     required_parameters: [
-      { name: "text", description: "the text to echo", ptype: TString },
+      { name: "text", description: "the text to echo", ptype: TString, },
     ],
     optional_parameters: [],
   }
@@ -69,7 +69,7 @@ fn content_text(result : Json) -> String {
 #coverage.skip
 fn main {
   let server = @mcp.McpServer::new(
-    @tools.ToolRegistry::new().add(EchoTool::{  }),
+    @tools.ToolRegistry::new().add(EchoTool::{ }),
   )
   let client = @mcp.McpClient::new(Loopback::{ server, })
   try {

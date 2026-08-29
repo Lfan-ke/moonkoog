@@ -20,7 +20,7 @@ pub struct LLMCritic {
 ///|
 /// A critic backed by `client` / `model`.
 pub fn LLMCritic::new(client : &LLMClient, model : @llm.LLModel) -> LLMCritic {
-  { client, model }
+  { client, model, }
 }
 
 ///|
@@ -42,9 +42,9 @@ pub async fn LLMCritic::judge(
     .build()
   let reply = LLMClient::execute(self.client, prompt~, model=self.model, tools=[]).text_content()
   if reply.has_prefix("CORRECT") {
-    { successful: true, feedback: "" }
+    { successful: true, feedback: "", }
   } else {
-    { successful: false, feedback: feedback_after_colon(reply) }
+    { successful: false, feedback: feedback_after_colon(reply), }
   }
 }
 
@@ -52,7 +52,7 @@ pub async fn LLMCritic::judge(
 /// The feedback text of a critic reply: everything after the first colon, without the
 /// leading space (empty when there is no colon).
 fn feedback_after_colon(reply : String) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   let mut seen_colon = false
   let mut skipped_space = false
   for c in reply {

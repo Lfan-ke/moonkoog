@@ -36,8 +36,8 @@ test "to_llm_tool builds a JSON-schema object from the descriptor" {
     name: "add",
     description: "add two ints",
     required_parameters: [
-      { name: "a", description: "x", ptype: @tools.TInteger },
-      { name: "b", description: "y", ptype: @tools.TInteger },
+      { name: "a", description: "x", ptype: @tools.TInteger, },
+      { name: "b", description: "y", ptype: @tools.TInteger, },
     ],
     optional_parameters: [],
   }
@@ -62,7 +62,7 @@ test "from_llm_message maps text and tool calls back to Koog parts" {
     role: @moonllm.Assistant,
     content: Str(""),
     tool_calls: Some([
-      { id: "c1", function: { name: "add", arguments: "{\"a\":2,\"b\":3}" } },
+      { id: "c1", function: { name: "add", arguments: "{\"a\":2,\"b\":3}", }, },
     ]),
     tool_call_id: None,
     name: None,
@@ -103,7 +103,7 @@ test "from_moderation_response maps flags and confidence scores to a Koog verdic
 
 ///|
 test "from_moderation_response is safe when the response carries no results" {
-  let resp : @moonllm.ModerationResponse = { model: "m", results: [] }
+  let resp : @moonllm.ModerationResponse = { model: "m", results: [], }
   assert_eq(from_moderation_response(resp).is_harmful, false)
 }
 
@@ -211,7 +211,7 @@ test "to_chat_request carries the model, messages, and tools" {
     name: "add",
     description: "add",
     required_parameters: [
-      { name: "a", description: "x", ptype: @tools.TInteger },
+      { name: "a", description: "x", ptype: @tools.TInteger, },
     ],
     optional_parameters: [],
   }

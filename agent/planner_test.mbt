@@ -47,7 +47,7 @@ async test "llm planner critic: CONTINUE keeps the plan, REPLAN discards it with
   @async.with_task_group(_g => {
     let plan : @agent.SimplePlan = {
       goal: "g",
-      steps: [{ description: "a", is_completed: false }],
+      steps: [{ description: "a", is_completed: false, }],
     }
     let keep = @agent.MockClient::new([@prompt.Message::assistant("CONTINUE")])
     let a1 = @agent.LLMPlanner::new(keep, @llm.deepseek_v4_flash)

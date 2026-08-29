@@ -175,7 +175,7 @@ pub fn AgentInterface::from_json(j : Json) -> AgentInterface raise {
   guard j is Object(o) else {
     raise A2AError("agent interface must be an object")
   }
-  { url: str_field(o, "url", ""), transport: str_field(o, "transport", "") }
+  { url: str_field(o, "url", ""), transport: str_field(o, "transport", ""), }
 }
 
 ///|

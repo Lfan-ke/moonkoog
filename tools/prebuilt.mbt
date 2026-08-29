@@ -24,7 +24,7 @@ pub struct ExitTool {}
 ///|
 /// The exit tool.
 pub fn ExitTool::new() -> ExitTool {
-  ExitTool::{  }
+  ExitTool::{ }
 }
 
 ///|
@@ -33,7 +33,7 @@ pub impl Tool for ExitTool with fn descriptor(_self) {
     name: "__exit__",
     description: "End the task and return the final result to the caller.",
     required_parameters: [
-      { name: "result", description: "the final answer", ptype: TString },
+      { name: "result", description: "the final answer", ptype: TString, },
     ],
     optional_parameters: [],
   }
@@ -62,7 +62,7 @@ pub impl Tool for SayToUser with fn descriptor(_self) {
     name: "say_to_user",
     description: "Show a message to the user.",
     required_parameters: [
-      { name: "message", description: "the message to show", ptype: TString },
+      { name: "message", description: "the message to show", ptype: TString, },
     ],
     optional_parameters: [],
   }
@@ -93,7 +93,7 @@ pub impl Tool for AskUser with fn descriptor(_self) {
     name: "ask_user",
     description: "Ask the user a question and receive their reply.",
     required_parameters: [
-      { name: "question", description: "the question to ask", ptype: TString },
+      { name: "question", description: "the question to ask", ptype: TString, },
     ],
     optional_parameters: [],
   }

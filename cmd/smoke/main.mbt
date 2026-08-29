@@ -8,8 +8,8 @@ impl @tools.Tool for Add with fn descriptor(_self) {
     name: "add",
     description: "add two integers a and b",
     required_parameters: [
-      { name: "a", description: "first addend", ptype: @tools.TInteger },
-      { name: "b", description: "second addend", ptype: @tools.TInteger },
+      { name: "a", description: "first addend", ptype: @tools.TInteger, },
+      { name: "b", description: "second addend", ptype: @tools.TInteger, },
     ],
     optional_parameters: [],
   }
@@ -63,7 +63,7 @@ async fn main {
       context_length: None,
       max_output_tokens: None,
     }
-    let registry = @tools.ToolRegistry::new().add(Add::{  })
+    let registry = @tools.ToolRegistry::new().add(Add::{ })
     let agent = @agent.AIAgent::new(
       client,
       model~,

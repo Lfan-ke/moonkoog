@@ -106,7 +106,7 @@ pub(all) struct ToolRegistry {
 ///|
 /// An empty registry (Koog `ToolRegistry.EMPTY`).
 pub fn ToolRegistry::new() -> ToolRegistry {
-  { tools: [] }
+  { tools: [], }
 }
 
 ///|

@@ -105,7 +105,7 @@ async fn main {
     }
     let a5 = agent_over(
       [plain, call, exit],
-      registry=@tools.ToolRegistry::new().add(Greet::{  }),
+      registry=@tools.ToolRegistry::new().add(Greet::{ }),
     )
     println(
       "chat: " +

@@ -21,7 +21,7 @@ pub struct MemFileSystem {
 ///|
 /// An empty in-memory filesystem.
 pub fn MemFileSystem::new() -> MemFileSystem {
-  { files: Map([]) }
+  { files: Map([]), }
 }
 
 ///|
@@ -65,7 +65,7 @@ pub impl Tool for ReadFileTool with fn descriptor(_self) {
     name: "read_file",
     description: "Read the contents of a file at a path.",
     required_parameters: [
-      { name: "path", description: "the file path", ptype: TString },
+      { name: "path", description: "the file path", ptype: TString, },
     ],
     optional_parameters: [],
   }
@@ -98,8 +98,8 @@ pub impl Tool for WriteFileTool with fn descriptor(_self) {
     name: "write_file",
     description: "Write text contents to a file at a path.",
     required_parameters: [
-      { name: "path", description: "the file path", ptype: TString },
-      { name: "content", description: "the text to write", ptype: TString },
+      { name: "path", description: "the file path", ptype: TString, },
+      { name: "content", description: "the text to write", ptype: TString, },
     ],
     optional_parameters: [],
   }
@@ -130,7 +130,7 @@ pub impl Tool for ListDirectoryTool with fn descriptor(_self) {
     name: "list_directory",
     description: "List the files under a directory path.",
     required_parameters: [
-      { name: "path", description: "the directory path", ptype: TString },
+      { name: "path", description: "the directory path", ptype: TString, },
     ],
     optional_parameters: [],
   }

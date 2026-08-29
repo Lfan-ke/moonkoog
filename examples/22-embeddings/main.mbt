@@ -9,9 +9,9 @@
 #coverage.skip
 async fn main {
   @async.with_task_group(_g => {
-    let a : @embeddings.Vector = { values: [3.0, 4.0] }
-    let b : @embeddings.Vector = { values: [4.0, 3.0] }
-    let zero : @embeddings.Vector = { values: [0.0, 0.0] }
+    let a : @embeddings.Vector = { values: [3.0, 4.0], }
+    let b : @embeddings.Vector = { values: [4.0, 3.0], }
+    let zero : @embeddings.Vector = { values: [0.0, 0.0], }
     println(
       "a: dim=\{a.dimension()} magnitude=" +
       a.magnitude().to_string() +

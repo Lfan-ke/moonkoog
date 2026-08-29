@@ -23,9 +23,9 @@ async test "event hooks observe the agent lifecycle across a tool loop" {
         log.push("tool-done:" + tool + "=" + result)
       })
       .on_agent_completed(result => log.push("agent-done:" + result))
-    let registry = @tools.ToolRegistry::new().add(AddTool::{  })
+    let registry = @tools.ToolRegistry::new().add(AddTool::{ })
     let agent = @agent.AIAgent::new(
-      LoopClient::{  },
+      LoopClient::{ },
       model=@llm.deepseek_v4_flash,
       tool_registry=registry,
       events~,

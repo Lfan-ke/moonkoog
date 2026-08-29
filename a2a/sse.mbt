@@ -16,7 +16,7 @@ pub(all) struct SseEvent {
 pub fn parse_sse(text : String) -> Array[SseEvent] {
   let events : Array[SseEvent] = []
   let mut event_type = ""
-  let data = StringBuilder::new()
+  let data = StringBuilder()
   let mut has_data = false
   let mut last_id : String? = None
   for line in sse_lines(text) {
@@ -84,7 +84,7 @@ fn split_field(line : String) -> (String, String) {
 /// Split `text` on CR, LF, or CRLF line breaks (SSE accepts all three).
 fn sse_lines(text : String) -> Array[String] {
   let lines : Array[String] = []
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   let chars = chars_of(text)
   let mut i = 0
   while i < chars.length() {
@@ -118,7 +118,7 @@ fn chars_of(s : String) -> Array[Char] {
 
 ///|
 fn chars_to_string(a : Array[Char], start : Int, end : Int) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   for i in start..<end {
     sb.write_string(a[i].to_string())
   }

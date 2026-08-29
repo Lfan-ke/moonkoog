@@ -39,7 +39,7 @@ test "mcp: lists tools and adapts each into a ToolDescriptor with the right requ
       #|      "required": ["a"] } } ] }
     ),
   )
-  let transport = MockTransport::{ list_result, call_result: Json::object({}) }
+  let transport = MockTransport::{ list_result, call_result: Json::object({}), }
   let registry = @mcp.mcp_tool_registry(@mcp.McpClient::new(transport))
   let d = registry.get_tool("add").unwrap().descriptor()
   assert_eq(d.name, "add")
@@ -58,7 +58,7 @@ test "mcp: an error result renders as an Error-prefixed message with the text co
       #|{ "content": [ { "type": "text", "text": "boom" } ], "isError": true }
     ),
   )
-  let transport = MockTransport::{ list_result: Json::object({}), call_result }
+  let transport = MockTransport::{ list_result: Json::object({}), call_result, }
   let tool : &@tools.Tool = @mcp.McpTool::new(@mcp.McpClient::new(transport), {
     name: "x",
     description: "",
@@ -75,7 +75,7 @@ test "mcp: a success result is returned as JSON carrying the content text" {
       #|{ "content": [ { "type": "text", "text": "42" } ], "isError": false }
     ),
   )
-  let transport = MockTransport::{ list_result: Json::object({}), call_result }
+  let transport = MockTransport::{ list_result: Json::object({}), call_result, }
   let tool : &@tools.Tool = @mcp.McpTool::new(@mcp.McpClient::new(transport), {
     name: "x",
     description: "",
@@ -136,15 +136,15 @@ test "mcp parser: maps arrays, enums, anyOf, nullable type-arrays and $ref" {
   assert_eq(
     ptype_of("age"),
     @tools.TAnyOf([
-      { name: "", description: "", ptype: @tools.TNull },
-      { name: "", description: "", ptype: @tools.TInteger },
+      { name: "", description: "", ptype: @tools.TNull, },
+      { name: "", description: "", ptype: @tools.TInteger, },
     ]),
   )
   assert_eq(
     ptype_of("mode"),
     @tools.TAnyOf([
-      { name: "", description: "", ptype: @tools.TString },
-      { name: "", description: "", ptype: @tools.TInteger },
+      { name: "", description: "", ptype: @tools.TString, },
+      { name: "", description: "", ptype: @tools.TInteger, },
     ]),
   )
   assert_eq(ptype_of("color"), @tools.TEnum(["red", "green"]))

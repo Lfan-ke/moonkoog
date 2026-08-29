@@ -43,8 +43,8 @@ impl @agent.LLMClient for Flagging with fn moderate(_self, prompt~, model~) {
   {
     is_harmful: true,
     categories: {
-      "violence": { detected: true, confidence_score: Some(0.92) },
-      "hate": { detected: false, confidence_score: Some(0.02) },
+      "violence": { detected: true, confidence_score: Some(0.92), },
+      "hate": { detected: false, confidence_score: Some(0.02), },
     },
   }
 }
@@ -74,7 +74,7 @@ async fn main {
     println(
       "plain client: harmful=\{safe.is_harmful} violence=\{safe.is_category_detected("violence")}",
     )
-    let flagging : &@agent.LLMClient = Flagging::{  }
+    let flagging : &@agent.LLMClient = Flagging::{ }
     let checked = flagging.moderate(prompt=one_prompt(), model~)
     println(
       "moderating client: harmful=\{checked.is_harmful} violence=\{checked.is_category_detected("violence")} hate=\{checked.is_category_detected("hate")}",

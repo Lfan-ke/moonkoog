@@ -18,7 +18,7 @@ pub fn RetryingClient::new(
   inner : &LLMClient,
   max_attempts? : Int = 3,
 ) -> RetryingClient {
-  { inner, max_attempts }
+  { inner, max_attempts, }
 }
 
 ///|

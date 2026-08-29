@@ -31,8 +31,9 @@ pub async fn AgentEndpoint::handle(
   body : String,
 ) -> AgentResponse {
   match parse_message(body) {
-    Some(message) => { status: 200, body: output_body(self.agent.run(message)) }
-    None => { status: 400, body: error_body("invalid request body") }
+    Some(message) =>
+      { status: 200, body: output_body(self.agent.run(message)), }
+    None => { status: 400, body: error_body("invalid request body"), }
   }
 }
 

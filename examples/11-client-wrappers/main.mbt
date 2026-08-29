@@ -116,7 +116,7 @@ async fn main {
     let model = @llm.deepseek_v4_flash
 
     // Caching: the second identical prompt does not reach the inner client.
-    let counter = Counting::{ calls: 0 }
+    let counter = Counting::{ calls: 0, }
     let cached = @agent.CachingClient::new(counter)
     let p = one_prompt()
     let _ = @agent.LLMClient::execute(cached, prompt=p, model~, tools=[])
@@ -126,7 +126,7 @@ async fn main {
     )
 
     // Retry: two transient failures, then success on the third attempt.
-    let flaky = Flaky::{ calls: 0, fail_times: 2 }
+    let flaky = Flaky::{ calls: 0, fail_times: 2, }
     let retrying = @agent.RetryingClient::new(flaky, max_attempts=3)
     let reply = @agent.LLMClient::execute(
       retrying,

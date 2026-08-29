@@ -66,7 +66,7 @@ pub impl @agent.LLMClient for OpenAiCompatibleClient with fn execute_streaming(
       ),
     )
   }
-  { role: Assistant, parts, finish_reason: result.finish_reason }
+  { role: Assistant, parts, finish_reason: result.finish_reason, }
 }
 
 ///|
@@ -93,7 +93,7 @@ pub impl @agent.LLMClient for OpenAiCompatibleClient with fn moderate(
 ///|
 /// The text a prompt contributes to moderation: every message's `Text` parts, newline-joined.
 fn moderation_input(prompt : @prompt.Prompt) -> String {
-  let sb = StringBuilder::new()
+  let sb = StringBuilder()
   let mut first = true
   for m in prompt.messages {
     for part in m.parts {
@@ -124,7 +124,7 @@ fn from_moderation_response(
       confidence_score: r.category_scores.get(name),
     }
   }
-  { is_harmful: r.flagged, categories }
+  { is_harmful: r.flagged, categories, }
 }
 
 ///|
@@ -210,7 +210,7 @@ fn to_llm_message(m : @prompt.Message) -> @moonllm.Message {
       ToolCall(id~, tool~, args~) =>
         tool_calls.push({
           id: id.unwrap_or(""),
-          function: { name: tool, arguments: args.stringify() },
+          function: { name: tool, arguments: args.stringify(), },
         })
     }
   }
@@ -307,7 +307,7 @@ fn from_chat_response_all(
 /// Map a moonllm chat response to a Koog assistant message (the first choice).
 fn from_chat_response(resp : @moonllm.ChatResponse) -> @prompt.Message {
   guard resp.choices.length() > 0 else {
-    { role: Assistant, parts: [], finish_reason: None }
+    { role: Assistant, parts: [], finish_reason: None, }
   }
   let choice = resp.choices[0]
   from_llm_message(choice.message, choice.finish_reason)
@@ -336,7 +336,7 @@ fn from_llm_message(
       )
     }
   }
-  { role: Assistant, parts, finish_reason }
+  { role: Assistant, parts, finish_reason, }
 }
 
 ///|

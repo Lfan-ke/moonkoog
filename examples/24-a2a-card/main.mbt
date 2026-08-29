@@ -26,10 +26,10 @@ fn main {
     url: "https://agent.example/jsonrpc",
     preferred_transport: "JSONRPC",
     additional_interfaces: Some([
-      { url: "https://agent.example/grpc", transport: "GRPC" },
+      { url: "https://agent.example/grpc", transport: "GRPC", },
     ]),
     icon_url: Some("https://agent.example/icon.png"),
-    provider: Some({ organization: "heke1228", url: "https://heke.example" }),
+    provider: Some({ organization: "heke1228", url: "https://heke.example", }),
     version: "1.2.3",
     documentation_url: None,
     capabilities: {
@@ -90,7 +90,7 @@ fn main {
 
   // The resolver fetches and parses from an injected source.
   try {
-    let resolved = @a2a.resolve_agent_card(StaticSource::{ doc: wire })
+    let resolved = @a2a.resolve_agent_card(StaticSource::{ doc: wire, })
     println("resolved name: " + resolved.name)
   } catch {
     e => println("resolve failed: " + e.to_string())

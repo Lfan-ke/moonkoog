@@ -17,7 +17,7 @@ pub(all) struct ModerationResult {
 ///|
 /// A verdict that flags nothing — what a client without moderation support returns.
 pub fn ModerationResult::safe() -> ModerationResult {
-  { is_harmful: false, categories: Map([]) }
+  { is_harmful: false, categories: Map([]), }
 }
 
 ///|

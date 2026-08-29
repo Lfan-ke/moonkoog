@@ -12,7 +12,7 @@ fn parse_person(j : Json) -> Person? {
   guard j is Object(m) else { return None }
   guard m.get("name") is Some(String(name)) else { return None }
   guard m.get("age") is Some(Number(age, ..)) else { return None }
-  Some({ name, age: age.to_int() })
+  Some({ name, age: age.to_int(), })
 }
 
 ///|
@@ -23,8 +23,8 @@ fn person_schema() -> @agent.StructuredSchema[Person] {
     description: "a person with a name and age",
     schema: @tools.TObject(
       properties=[
-        { name: "name", description: "full name", ptype: @tools.TString },
-        { name: "age", description: "age in years", ptype: @tools.TInteger },
+        { name: "name", description: "full name", ptype: @tools.TString, },
+        { name: "age", description: "age in years", ptype: @tools.TInteger, },
       ],
       required=["name", "age"],
     ),
@@ -42,7 +42,7 @@ async test "request_structured parses a valid JSON reply" {
     let out = agent.request_structured("who?", person_schema()) catch {
       e => fail(e.to_string())
     }
-    assert_eq(out.value, { name: "Ann", age: 30 })
+    assert_eq(out.value, { name: "Ann", age: 30, })
   })
 }
 
@@ -57,7 +57,7 @@ async test "request_structured retries with a fixing prompt on malformed output"
     let out = agent.request_structured("who?", person_schema()) catch {
       e => fail(e.to_string())
     }
-    assert_eq(out.value, { name: "Bob", age: 25 })
+    assert_eq(out.value, { name: "Bob", age: 25, })
   })
 }
 
@@ -73,7 +73,7 @@ async test "request_structured extracts JSON from prose and code fences" {
     let out = agent.request_structured("who?", person_schema()) catch {
       e => fail(e.to_string())
     }
-    assert_eq(out.value, { name: "Cid", age: 40 })
+    assert_eq(out.value, { name: "Cid", age: 40, })
   })
 }
 

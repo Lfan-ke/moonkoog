@@ -31,19 +31,19 @@ pub(all) struct Message {
 ///|
 /// A plain system message.
 pub fn Message::system(text : String) -> Message {
-  { role: System, parts: [Text(text)], finish_reason: None }
+  { role: System, parts: [Text(text)], finish_reason: None, }
 }
 
 ///|
 /// A plain user message.
 pub fn Message::user(text : String) -> Message {
-  { role: User, parts: [Text(text)], finish_reason: None }
+  { role: User, parts: [Text(text)], finish_reason: None, }
 }
 
 ///|
 /// A plain assistant message.
 pub fn Message::assistant(text : String) -> Message {
-  { role: Assistant, parts: [Text(text)], finish_reason: None }
+  { role: Assistant, parts: [Text(text)], finish_reason: None, }
 }
 
 ///|
