@@ -1,7 +1,7 @@
 ///|
 /// The JSON-schema type of a tool parameter. Koog's `ToolParameterType` is a
 /// sealed hierarchy; this is a faithful 1:1 sum. `TList`/`TObject`/`TAnyOf` recur.
-/// Source: agents/agents-tools/.../tools/ToolParameterType.kt.
+/// Source: agents/agents-tools/.../tools/ToolDescriptor.kt.
 pub(all) enum ToolParameterType {
   TString
   TInteger

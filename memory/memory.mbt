@@ -1,3 +1,9 @@
+// This package tracks Koog **0.7.3**, not 1.1.1 like the rest of the repo. The
+// `Concept` / `Fact` / `MemorySubject` / `MemoryScope` / `AgentMemoryProvider` model
+// transcribed here was removed upstream by 0.8.0, where memory became `ChatMemory`
+// (chat-history providers) and `LongTermMemory` (`MemoryRecord` + ingestion and
+// retrieval). Re-anchoring means rewriting this package, not renaming it.
+
 ///|
 /// Whether a concept holds one fact or many (Koog `FactType`).
 pub(all) enum FactType {

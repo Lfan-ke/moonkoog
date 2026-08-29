@@ -13,7 +13,7 @@
 /// Arbitrary nodes are `NodeCustom` handlers run against a `NodeSession` — the
 /// MoonBit-idiomatic stand-in for Kotlin's receiver-lambda node DSL — and edges may
 /// carry a value transform, together enough to express Koog's chat and reAct strategies.
-/// Source: agents/agents-core/.../agent/entity/{AIAgentStrategy,AIAgentNodeBase,
+/// Source: agents/agents-core/.../agent/entity/{AIAgentStrategy,AIAgentNode,
 /// AIAgentEdge}.kt and AIAgentSimpleStrategies.kt (`singleRunStrategy`).
 
 ///|
@@ -406,16 +406,18 @@ async fn run_node(
       for call in reply.tool_calls() {
         guard call is @prompt.ToolCall(id~, tool~, args~) else { continue }
         (ctx.events.on_tool_call_starting)(tool, args)
-        let output = match ctx.tool_registry.get_tool(tool) {
+        // A tool that failed has to say so on the result, not just put its message
+        // in the text: the model reads `is_error` to decide whether to try again.
+        let (output, failed) = match ctx.tool_registry.get_tool(tool) {
           Some(t) =>
-            t.execute_raw(args) catch {
-              e => "tool error: " + e.to_string()
+            (t.execute_raw(args), false) catch {
+              e => ("tool error: " + e.to_string(), true)
             }
-          None => "unknown tool: " + tool
+          None => ("unknown tool: " + tool, true)
         }
         (ctx.events.on_tool_call_completed)(tool, output)
         ctx.prompt = ctx.prompt.append(
-          @prompt.Message::tool_result(tool~, output~, id~),
+          @prompt.Message::tool_result(tool~, output~, id~, is_error=failed),
         )
       }
       VUnit

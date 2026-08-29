@@ -106,3 +106,24 @@ async test "a stopped run finishes its current node and goes no further" {
     assert_eq(handle.stopping(), true)
   })
 }
+
+///|
+/// A tool that raises is reported as an error result, not as ordinary output. The
+/// model reads `is_error` to decide whether to try again, so burying the failure in
+/// the text would tell it the call succeeded.
+test "a failing tool result carries is_error" {
+  let ok = @prompt.Message::tool_result(tool="add", output="5")
+  let bad = @prompt.Message::tool_result(
+    tool="add",
+    output="tool error: boom",
+    is_error=true,
+  )
+  let flag = fn(m : @prompt.Message) -> Bool {
+    match m.parts[0] {
+      ToolResult(is_error~, ..) => is_error
+      _ => false
+    }
+  }
+  assert_eq(flag(ok), false)
+  assert_eq(flag(bad), true)
+}

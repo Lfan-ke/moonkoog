@@ -1,4 +1,4 @@
-// A retrying LLM client (Koog `RetryingPromptExecutor`): wrap a client and re-run a failed
+// A retrying LLM client (Koog `RetryingLLMClient`): wrap a client and re-run a failed
 // `execute` up to `max_attempts` times before giving up, so a transient provider error — a
 // dropped connection, a 5xx, a rate-limit blip — doesn't fail the whole agent step. The other
 // calls delegate straight through; `execute_streaming` inherits the retry through the default,

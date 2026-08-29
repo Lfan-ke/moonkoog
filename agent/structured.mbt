@@ -7,7 +7,7 @@
 /// `@tools.ToolParameterType`, usually a `TObject`) and supplies the `parse` that
 /// turns the model's JSON into `T` — the same explicit shape a tool takes for its
 /// descriptor plus `decodeArgs`.
-/// Source: prompt/prompt-structure/.../StructuredOutput.kt and
+/// Source: prompt/prompt-structure/.../StructuredRequest.kt and
 /// agents/.../StructureFixingParser.kt.
 
 ///|
