@@ -71,9 +71,16 @@ pub fn AgentStorage::size(self : AgentStorage) -> Int {
 
 ///|
 /// A Json snapshot of the whole store — every entry as a field of a Json object (Koog's
-/// `toSerializedMap`). This is what a checkpoint persists.
+/// `toSerializedMap`). This is what a checkpoint persists, so it has to be a value taken at
+/// this instant: `Json::object` wraps the map it is handed rather than copying it, and handing
+/// over `entries` would file a checkpoint that keeps changing as the run writes on, until an
+/// early checkpoint read back the run's final state.
 pub fn AgentStorage::snapshot(self : AgentStorage) -> Json {
-  Json::object(self.entries)
+  let taken : Map[String, Json] = Map([])
+  for key, value in self.entries {
+    taken[key] = value
+  }
+  Json::object(taken)
 }
 
 ///|

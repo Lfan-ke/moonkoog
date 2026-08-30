@@ -66,7 +66,9 @@ pub impl @agent.LLMClient for OpenAiCompatibleClient with fn execute_streaming(
       ),
     )
   }
-  { role: Assistant, parts, finish_reason: result.finish_reason, }
+  // A streamed completion carries no `usage` on the SSE feed moonllm reassembles, so the
+  // reply's meta stays unset rather than guessed at.
+  { role: Assistant, parts, finish_reason: result.finish_reason, meta: None, }
 }
 
 ///|
@@ -291,26 +293,50 @@ pub impl @agent.LLMClient for OpenAiCompatibleClient with fn execute_multiple(
 }
 
 ///|
+/// What the provider reported about the call: the `usage` object an OpenAI-compatible
+/// endpoint returns beside the choices, and the model id that served the request. A
+/// response without `usage` leaves the counts unset — zero would claim the call was free.
+fn response_meta(resp : @moonllm.ChatResponse) -> @prompt.ResponseMetaInfo {
+  let model = if resp.model == "" { None } else { Some(resp.model) }
+  match resp.usage {
+    Some(u) =>
+      {
+        total_tokens: Some(u.total_tokens),
+        input_tokens: Some(u.prompt_tokens),
+        output_tokens: Some(u.completion_tokens),
+        model,
+      }
+    None => { ..@prompt.ResponseMetaInfo::empty(), model, }
+  }
+}
+
+///|
 /// Map every choice of a moonllm chat response to a Koog assistant message (Koog
-/// `executeMultipleChoices` returns one per choice).
+/// `executeMultipleChoices` returns one per choice). The usage is reported per response,
+/// not per choice, so every candidate carries the same meta.
 fn from_chat_response_all(
   resp : @moonllm.ChatResponse,
 ) -> Array[@prompt.Message] {
+  let meta = response_meta(resp)
   let out : Array[@prompt.Message] = []
   for choice in resp.choices {
-    out.push(from_llm_message(choice.message, choice.finish_reason))
+    out.push(
+      from_llm_message(choice.message, choice.finish_reason).with_meta(meta),
+    )
   }
   out
 }
 
 ///|
-/// Map a moonllm chat response to a Koog assistant message (the first choice).
+/// Map a moonllm chat response to a Koog assistant message (the first choice), carrying the
+/// tokens the provider charged.
 fn from_chat_response(resp : @moonllm.ChatResponse) -> @prompt.Message {
+  let meta = response_meta(resp)
   guard resp.choices.length() > 0 else {
-    { role: Assistant, parts: [], finish_reason: None, }
+    { role: Assistant, parts: [], finish_reason: None, meta: Some(meta), }
   }
   let choice = resp.choices[0]
-  from_llm_message(choice.message, choice.finish_reason)
+  from_llm_message(choice.message, choice.finish_reason).with_meta(meta)
 }
 
 ///|
@@ -336,7 +362,7 @@ fn from_llm_message(
       )
     }
   }
-  { role: Assistant, parts, finish_reason, }
+  { role: Assistant, parts, finish_reason, meta: None, }
 }
 
 ///|

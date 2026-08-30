@@ -20,30 +20,65 @@ pub(all) enum MessagePart {
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
+/// What the provider reported about the call that produced a reply (Koog
+/// `ResponseMetaInfo`): the tokens it charged and the model id that actually served it,
+/// which can differ from the one asked for. Every field is optional, because an
+/// endpoint may answer without a `usage` object at all — and an absent count is not the
+/// same as a zero one, which would read as a call that cost nothing.
+pub(all) struct ResponseMetaInfo {
+  total_tokens : Int?
+  input_tokens : Int?
+  output_tokens : Int?
+  model : String?
+} derive(Eq, Debug, ToJson, FromJson)
+
+///|
+/// Meta with nothing reported — what a request message carries and what a reply from an
+/// endpoint that sends no usage gets.
+pub fn ResponseMetaInfo::empty() -> ResponseMetaInfo {
+  { total_tokens: None, input_tokens: None, output_tokens: None, model: None, }
+}
+
+///|
 /// A single message: a role and its ordered content parts. `finish_reason` is the
-/// provider's stop reason on an assistant reply, `None` on a request message.
+/// provider's stop reason on an assistant reply, `None` on a request message; `meta` is
+/// what the provider reported about the call, `None` on anything the caller wrote.
 pub(all) struct Message {
   role : Role
   parts : Array[MessagePart]
   finish_reason : String?
+  meta : ResponseMetaInfo?
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
 /// A plain system message.
 pub fn Message::system(text : String) -> Message {
-  { role: System, parts: [Text(text)], finish_reason: None, }
+  { role: System, parts: [Text(text)], finish_reason: None, meta: None, }
 }
 
 ///|
 /// A plain user message.
 pub fn Message::user(text : String) -> Message {
-  { role: User, parts: [Text(text)], finish_reason: None, }
+  { role: User, parts: [Text(text)], finish_reason: None, meta: None, }
 }
 
 ///|
 /// A plain assistant message.
 pub fn Message::assistant(text : String) -> Message {
-  { role: Assistant, parts: [Text(text)], finish_reason: None, }
+  { role: Assistant, parts: [Text(text)], finish_reason: None, meta: None, }
+}
+
+///|
+/// A copy of this message carrying `meta` — how a client attaches the provider's token
+/// counts once the reply's content has been mapped.
+pub fn Message::with_meta(self : Message, meta : ResponseMetaInfo) -> Message {
+  { ..self, meta: Some(meta), }
+}
+
+///|
+/// The tokens this reply cost in total, when the provider reported them.
+pub fn Message::total_tokens(self : Message) -> Int? {
+  self.meta.bind(m => m.total_tokens)
 }
 
 ///|
@@ -60,6 +95,7 @@ pub fn Message::tool_result(
     role: User,
     parts: [ToolResult(id~, tool~, output~, is_error~)],
     finish_reason: None,
+    meta: None,
   }
 }
 

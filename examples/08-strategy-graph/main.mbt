@@ -93,6 +93,7 @@ async fn main {
       role: @prompt.Assistant,
       parts: [@prompt.ToolCall(id=Some("c1"), tool="greet", args={})],
       finish_reason: None,
+      meta: None,
     }
     let exit : @prompt.Message = {
       role: @prompt.Assistant,
@@ -102,6 +103,7 @@ async fn main {
         }),
       ],
       finish_reason: None,
+      meta: None,
     }
     let a5 = agent_over(
       [plain, call, exit],

@@ -22,6 +22,7 @@ test "to_llm_message maps an assistant tool call" {
     role: Assistant,
     parts: [@prompt.ToolCall(id=Some("c1"), tool="add", args={ "a": 2 })],
     finish_reason: None,
+    meta: None,
   })
   assert_eq(m.role, @moonllm.Assistant)
   guard m.tool_calls is Some(tcs) else { fail("expected tool calls") }
@@ -152,6 +153,77 @@ test "from_chat_response_all maps every choice to its own Koog message" {
   assert_eq(msgs[0].text_content(), "first")
   assert_eq(msgs[1].text_content(), "second")
   assert_eq(msgs[1].finish_reason, Some("length"))
+}
+
+///|
+/// From the bytes an endpoint actually sends to the message the agent goes on with: the `usage`
+/// object used to be dropped on the floor here.
+test "a reply's token counts survive from the wire to the message" {
+  let body =
+    #|{"id":"chatcmpl-233","object":"chat.completion","created":1,
+    #| "model":"deepseek-v4-flash-0801",
+    #| "choices":[{"index":0,"message":{"role":"assistant","content":"hhh"},
+    #|             "finish_reason":"stop"}],
+    #| "usage":{"prompt_tokens":66,"completion_tokens":6,"total_tokens":72}}
+  let resp : @moonllm.ChatResponse = @json.from_json(@json.parse(body)) catch {
+    e => fail("could not decode the response: " + e.to_string())
+  }
+  let m = from_chat_response(resp)
+  assert_eq(m.text_content(), "hhh")
+  guard m.meta is Some(meta) else { fail("the reply carries no meta") }
+  assert_eq(meta.input_tokens, Some(66))
+  assert_eq(meta.output_tokens, Some(6))
+  assert_eq(meta.total_tokens, Some(72))
+  // The model the provider says served it, which need not be the one asked for.
+  assert_eq(meta.model, Some("deepseek-v4-flash-0801"))
+  assert_eq(m.total_tokens(), Some(72))
+}
+
+///|
+/// An endpoint that reports no usage leaves the counts unset — not zero, which would read as a
+/// call that cost nothing.
+test "a reply without usage carries the model but no counts" {
+  let resp : @moonllm.ChatResponse = {
+    id: "x",
+    object: "chat.completion",
+    created: 0L,
+    model: "m",
+    choices: [
+      {
+        index: 0,
+        message: {
+          role: @moonllm.Assistant,
+          content: Str("emm"),
+          tool_calls: None,
+          tool_call_id: None,
+          name: None,
+        },
+        finish_reason: Some("stop"),
+      },
+    ],
+    usage: None,
+    system_fingerprint: None,
+  }
+  guard from_chat_response(resp).meta is Some(meta) else {
+    fail("the reply carries no meta")
+  }
+  assert_eq(meta.total_tokens, None)
+  assert_eq(meta.model, Some("m"))
+}
+
+///|
+test "every choice of a multi-choice reply carries the response's usage" {
+  let body =
+    #|{"id":"c","object":"chat.completion","created":1,"model":"m",
+    #| "choices":[{"index":0,"message":{"role":"assistant","content":"one"},"finish_reason":"stop"},
+    #|            {"index":1,"message":{"role":"assistant","content":"two"},"finish_reason":"stop"}],
+    #| "usage":{"prompt_tokens":10,"completion_tokens":4,"total_tokens":14}}
+  let resp : @moonllm.ChatResponse = @json.from_json(@json.parse(body)) catch {
+    e => fail("could not decode the response: " + e.to_string())
+  }
+  let msgs = from_chat_response_all(resp)
+  assert_eq(msgs.length(), 2)
+  assert_eq(msgs.map(m => m.total_tokens()), [Some(14), Some(14)])
 }
 
 ///|

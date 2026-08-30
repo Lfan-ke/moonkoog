@@ -72,6 +72,7 @@ impl @agent.LLMClient for LoopClient with fn execute(
           }),
         ],
         finish_reason: None,
+        meta: None,
       }
   }
 }

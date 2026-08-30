@@ -29,6 +29,7 @@ async test "chat strategy: nudges on plain text, runs a tool, finishes on the ex
         @prompt.ToolCall(id=Some("c1"), tool="greet", args={ "name": "lfanke" }),
       ],
       finish_reason: None,
+      meta: None,
     }
     let exit_call : @prompt.Message = {
       role: @prompt.Assistant,
@@ -38,6 +39,7 @@ async test "chat strategy: nudges on plain text, runs a tool, finishes on the ex
         }),
       ],
       finish_reason: None,
+      meta: None,
     }
     let mock = @agent.MockClient::new([plain, tool_call, exit_call])
     let registry = @tools.ToolRegistry::new().add(GreetTool::{ })

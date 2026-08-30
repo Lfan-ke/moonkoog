@@ -129,3 +129,34 @@ test "anthropic response: text and tool_use blocks become a Koog assistant messa
     _ => abort("expected a tool call")
   }
 }
+
+///|
+/// Anthropic reports the two counts separately and no total, so the total is their sum.
+test "anthropic response: usage becomes the reply's token counts" {
+  let response = @json.parse(
+    (
+      #|{"id":"msg_1","type":"message","role":"assistant","model":"claude-3-5-sonnet-20241022","content":[{"type":"text","text":"hi"}],"stop_reason":"end_turn","usage":{"input_tokens":66,"output_tokens":6}}
+    ),
+  )
+  guard from_anthropic_response(response).meta is Some(meta) else {
+    fail("the reply carries no meta")
+  }
+  assert_eq(meta.input_tokens, Some(66))
+  assert_eq(meta.output_tokens, Some(6))
+  assert_eq(meta.total_tokens, Some(72))
+  assert_eq(meta.model, Some("claude-3-5-sonnet-20241022"))
+}
+
+///|
+test "anthropic response: no usage block leaves the counts unset" {
+  let response = @json.parse(
+    (
+      #|{"id":"msg_1","type":"message","role":"assistant","content":[{"type":"text","text":"hi"}],"stop_reason":"end_turn"}
+    ),
+  )
+  guard from_anthropic_response(response).meta is Some(meta) else {
+    fail("the reply carries no meta")
+  }
+  assert_eq(meta.total_tokens, None)
+  assert_eq(meta.model, None)
+}

@@ -139,6 +139,59 @@ async test "checkpointing: a run snapshots every node boundary" {
 }
 
 ///|
+/// A checkpoint is a point-in-time value, not a window onto the live run: the one taken before
+/// the first node was taken when the store was empty, and nothing the run writes afterwards may
+/// appear in it. This is a regression — the storage snapshot used to hand the checkpoint the
+/// run's own map, so an early checkpoint read back the run's final state.
+async test "checkpointing: a checkpoint taken before a write does not see it" {
+  @async.with_task_group(_g => {
+    let store = @persistence.InMemoryPersistence::new()
+    let agent = @agent.AIAgent::new(
+      @agent.MockClient::new([]),
+      model=@llm.deepseek_v4_flash,
+    )
+    let strategy = @agent.AIAgentStrategy::new("late_write")
+      .custom_node("write", (s, v) => {
+        s.set("n", 233)
+        v
+      })
+      .edge(@agent.start_node, "write")
+      .edge("write", @agent.finish_node)
+    let _ = agent.run_strategy(
+      strategy,
+      "go",
+      checkpoints=@agent.Checkpointer::new(store, session="s1"),
+    ) catch {
+      e => fail(e.to_string())
+    }
+    let cps = store.get_checkpoints("s1")
+    assert_eq(cps.map(cp => cp.node_id), ["__start__", "write", "__finish__"])
+    let read_n = (cp : @persistence.AgentCheckpoint) => {
+      let restored = @agent.AgentStorage::new()
+      restored.restore(cp.storage)
+      (restored.get("n") : Int?)
+    }
+    // Before the write, twice: an empty store both times. Only the boundary after it sees 233.
+    assert_eq(read_n(cps[0]), None)
+    assert_eq(read_n(cps[1]), None)
+    assert_eq(read_n(cps[2]), Some(233))
+  })
+}
+
+///|
+/// The same guarantee one level down: a snapshot is a value, so writing to the store afterwards
+/// cannot reach back into what was already taken.
+test "node storage: a snapshot is a copy, not a window onto the store" {
+  let store = @agent.AgentStorage::new()
+  let empty = store.snapshot()
+  store.set("n", 233)
+  let one = store.snapshot()
+  store.set("n", 66666)
+  assert_eq(empty, Json::object(Map([])))
+  assert_eq(one, { "n": 233 })
+}
+
+///|
 async test "checkpointing: a resumed run continues at the right node" {
   @async.with_task_group(_g => {
     let store = @persistence.InMemoryPersistence::new()

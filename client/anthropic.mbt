@@ -126,10 +126,11 @@ fn anthropic_tool_choice(tc : @prompt.ToolChoice) -> Json {
 ///|
 /// Parse an Anthropic Messages API response into a Koog assistant message: each `text` content
 /// block becomes a `Text` part, each `tool_use` block a `ToolCall` (its `input` the arguments),
-/// and `stop_reason` the finish reason.
+/// `stop_reason` the finish reason, and `usage` the reply's token counts.
 pub fn from_anthropic_response(response : Json) -> @prompt.Message {
   let parts : Array[@prompt.MessagePart] = []
   let mut finish : String? = None
+  let mut meta = @prompt.ResponseMetaInfo::empty()
   match response {
     Object(obj) => {
       match obj.get("content") {
@@ -171,10 +172,39 @@ pub fn from_anthropic_response(response : Json) -> @prompt.Message {
         Some(String(s)) => finish = Some(s)
         _ => ()
       }
+      meta = anthropic_meta(obj)
     }
     _ => ()
   }
-  { role: Assistant, parts, finish_reason: finish, }
+  { role: Assistant, parts, finish_reason: finish, meta: Some(meta), }
+}
+
+///|
+/// The tokens an Anthropic response reports. Its `usage` names the two counts separately and
+/// gives no total, so the total is their sum — and only when both were reported, since a
+/// half-known total would be read as the whole cost.
+fn anthropic_meta(obj : Map[String, Json]) -> @prompt.ResponseMetaInfo {
+  let model = match obj.get("model") {
+    Some(String(m)) => Some(m)
+    _ => None
+  }
+  let usage = match obj.get("usage") {
+    Some(Object(u)) => u
+    _ => return { ..@prompt.ResponseMetaInfo::empty(), model, }
+  }
+  let count = key => {
+    match usage.get(key) {
+      Some(Number(n, ..)) => Some(n.to_int())
+      _ => None
+    }
+  }
+  let input_tokens = count("input_tokens")
+  let output_tokens = count("output_tokens")
+  let total_tokens = match (input_tokens, output_tokens) {
+    (Some(i), Some(o)) => Some(i + o)
+    _ => None
+  }
+  { total_tokens, input_tokens, output_tokens, model, }
 }
 
 ///|

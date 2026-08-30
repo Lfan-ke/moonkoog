@@ -9,6 +9,18 @@ pub suberror AgentError {
 }
 
 ///|
+/// What a failure hook is told about `error`. A `suberror`'s own `to_string` renders its type
+/// path — "…agent.AgentError.AgentError" — which tells a log nothing, so the two the graph
+/// raises are rendered from what they carry and anything else keeps its own text.
+fn error_text(error : Error) -> String {
+  match error {
+    AgentError(message) => message
+    AgentStopped(reached) => "stopped at: " + reached
+    _ => error.to_string()
+  }
+}
+
+///|
 /// A handle for stopping a run from outside it. Koog cancels the agent's coroutine,
 /// which can land in the middle of a tool call; a graph walk can stop more politely
 /// than that, so a run holding one of these finishes the node it is in and stops at

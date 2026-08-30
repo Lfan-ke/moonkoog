@@ -77,9 +77,14 @@ model catalog, the tool/registry model, the `AIAgent` tool-calling loop, and the
 strategy graph it is one wiring of — nodes, edges with arbitrary conditions and
 transforms, nested subgraphs, and parallel nodes; per-agent `LLMParams`, native
 structured output, a typed per-run store, node-boundary checkpointing with resume,
-and a retry with backoff and error classification. Next: multi-provider executors,
-memory, features, and the `a2a` / `rag` / MCP layers — plus the moon-heke
-integration (serving).
+and a retry with backoff and error classification. The event pipeline covers the
+agent, strategy, subgraph, node, LLM, streaming and tool hooks — including the
+failure ones — and the LLM and tool hooks come in an intercepting form that can
+rewrite the prompt, the reply, a tool's arguments or its result; `Tracing` renders
+all of them to a `TraceWriter`, and a reply carries the tokens the provider charged
+as `ResponseMetaInfo`. Next: multi-provider executors, memory, an OpenTelemetry
+exporter, and the `a2a` / `rag` / MCP layers — plus the moon-heke integration
+(serving).
 
 ## Build
 

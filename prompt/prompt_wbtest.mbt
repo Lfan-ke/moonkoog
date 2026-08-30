@@ -8,6 +8,7 @@ test "message text_content concatenates only Text parts" {
       Text("world"),
     ],
     finish_reason: None,
+    meta: None,
   }
   assert_eq(m.text_content(separator=" "), "hello world")
 }
@@ -22,6 +23,7 @@ test "message tool_calls returns the ToolCall parts in order" {
       ToolCall(id=Some("b"), tool="calc", args=Json::object({})),
     ],
     finish_reason: None,
+    meta: None,
   }
   let calls = m.tool_calls()
   assert_eq(calls.length(), 2)

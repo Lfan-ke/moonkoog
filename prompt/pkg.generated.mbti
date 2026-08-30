@@ -29,13 +29,16 @@ pub(all) struct Message {
   role : Role
   parts : Array[MessagePart]
   finish_reason : String?
+  meta : ResponseMetaInfo?
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
 pub fn Message::assistant(String) -> Self
 pub fn Message::system(String) -> Self
 pub fn Message::text_content(Self, separator? : String) -> String
 pub fn Message::tool_calls(Self) -> Array[MessagePart]
 pub fn Message::tool_result(tool~ : String, output~ : String, id? : String?, is_error? : Bool) -> Self
+pub fn Message::total_tokens(Self) -> Int?
 pub fn Message::user(String) -> Self
+pub fn Message::with_meta(Self, ResponseMetaInfo) -> Self
 
 pub(all) enum MessagePart {
   Text(String)
@@ -64,6 +67,14 @@ pub fn PromptBuilder::params(Self, LLMParams) -> Self
 pub fn PromptBuilder::system(Self, String) -> Self
 pub fn PromptBuilder::tool_result(Self, tool~ : String, output~ : String, id? : String?, is_error? : Bool) -> Self
 pub fn PromptBuilder::user(Self, String) -> Self
+
+pub(all) struct ResponseMetaInfo {
+  total_tokens : Int?
+  input_tokens : Int?
+  output_tokens : Int?
+  model : String?
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+pub fn ResponseMetaInfo::empty() -> Self
 
 pub(all) enum Role {
   System

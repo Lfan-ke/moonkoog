@@ -143,6 +143,7 @@ pub fn PromptBuilder::tool_result(
     role: User,
     parts: [ToolResult(id~, tool~, output~, is_error~)],
     finish_reason: None,
+    meta: None,
   })
   self
 }

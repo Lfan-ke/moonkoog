@@ -60,6 +60,7 @@ impl @agent.LLMClient for LoopClient with fn execute(
           @prompt.ToolCall(id=Some("c1"), tool="add", args={ "a": 2, "b": 3 }),
         ],
         finish_reason: None,
+        meta: None,
       }
   }
 }

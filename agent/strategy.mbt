@@ -446,16 +446,23 @@ pub fn NodeSession::append(
 }
 
 ///|
+/// Send `prompt` to the run's executor advertising `tools`, through the run's LLM
+/// interceptors: the before-hook decides what is actually sent — the run's own conversation is
+/// left as it is — and the after-hook what the graph goes on with.
+async fn call_llm(
+  ctx : StrategyContext,
+  prompt : @prompt.Prompt,
+  tools : Array[@tools.ToolDescriptor],
+) -> @prompt.Message {
+  let ask = (ctx.events.on_llm_call_starting)(prompt)
+  let reply = ctx.executor.execute(prompt=ask, model=ctx.model, tools~)
+  (ctx.events.on_llm_call_completed)(reply)
+}
+
+///|
 /// Request the model with the advertised tools (Koog `requestLLM`).
 pub async fn NodeSession::request_llm(self : NodeSession) -> @prompt.Message {
-  (self.ctx.events.on_llm_call_starting)(self.ctx.prompt)
-  let reply = self.ctx.executor.execute(
-    prompt=self.ctx.prompt,
-    model=self.ctx.model,
-    tools=self.ctx.descriptors,
-  )
-  (self.ctx.events.on_llm_call_completed)(reply)
-  reply
+  call_llm(self.ctx, self.ctx.prompt, self.ctx.descriptors)
 }
 
 ///|
@@ -463,14 +470,7 @@ pub async fn NodeSession::request_llm(self : NodeSession) -> @prompt.Message {
 pub async fn NodeSession::request_llm_no_tools(
   self : NodeSession,
 ) -> @prompt.Message {
-  (self.ctx.events.on_llm_call_starting)(self.ctx.prompt)
-  let reply = self.ctx.executor.execute(
-    prompt=self.ctx.prompt,
-    model=self.ctx.model,
-    tools=[],
-  )
-  (self.ctx.events.on_llm_call_completed)(reply)
-  reply
+  call_llm(self.ctx, self.ctx.prompt, [])
 }
 
 ///|
@@ -539,6 +539,31 @@ fn edge_matches(condition : EdgeCondition, value : NodeValue) -> Bool {
 }
 
 ///|
+/// What is wrong with `args` for the tool `descriptor` describes, or `None` when the call may
+/// proceed. Koog decodes a tool call's arguments into the tool's typed argument class and reports
+/// a decode failure as a validation failure; with no reflection here, the descriptor's required
+/// parameters are what there is to check against. A tool that requires nothing rules out nothing,
+/// so its arguments are taken as they come.
+fn missing_argument(descriptor : @tools.ToolDescriptor, args : Json) -> String? {
+  guard !descriptor.required_parameters.is_empty() else { return None }
+  guard args is Object(fields) else {
+    return Some("arguments for '" + descriptor.name + "' are not a JSON object")
+  }
+  for p in descriptor.required_parameters {
+    if fields.get(p.name) is None {
+      return Some(
+        "missing required parameter '" +
+        p.name +
+        "' for '" +
+        descriptor.name +
+        "'",
+      )
+    }
+  }
+  None
+}
+
+///|
 /// Run one node against the context, returning its output value. `strategy` is the graph
 /// the node belongs to — a subgraph node is dispatched against its own.
 async fn run_node(
@@ -554,31 +579,39 @@ async fn run_node(
       let input = value.text()
       ctx.prompt = ctx.prompt.append(@prompt.Message::user(input))
       charge_llm(ctx)
-      (ctx.events.on_llm_call_starting)(ctx.prompt)
-      let reply = ctx.executor.execute(
-        prompt=ctx.prompt,
-        model=ctx.model,
-        tools=ctx.descriptors,
-      )
-      (ctx.events.on_llm_call_completed)(reply)
-      VReply(reply)
+      VReply(call_llm(ctx, ctx.prompt, ctx.descriptors))
     }
     NodeExecuteTools => {
       guard value is VReply(reply) else { return VUnit }
       ctx.prompt = ctx.prompt.append(reply)
       for call in reply.tool_calls() {
         guard call is @prompt.ToolCall(id~, tool~, args~) else { continue }
-        (ctx.events.on_tool_call_starting)(tool, args)
+        let args = (ctx.events.on_tool_call_starting)(tool, args)
         // A tool that failed has to say so on the result, not just put its message
         // in the text: the model reads `is_error` to decide whether to try again.
         let (output, failed) = match ctx.tool_registry.get_tool(tool) {
+          None => {
+            let reason = "unknown tool: " + tool
+            (ctx.events.on_tool_call_failed)(tool, reason)
+            (reason, true)
+          }
           Some(t) =>
-            (t.execute_raw(args), false) catch {
-              e => ("tool error: " + e.to_string(), true)
+            match missing_argument(t.descriptor(), args) {
+              Some(reason) => {
+                (ctx.events.on_tool_validation_failed)(tool, args, reason)
+                (reason, true)
+              }
+              None =>
+                (t.execute_raw(args), false) catch {
+                  e => {
+                    let reason = "tool error: " + error_text(e)
+                    (ctx.events.on_tool_call_failed)(tool, reason)
+                    (reason, true)
+                  }
+                }
             }
-          None => ("unknown tool: " + tool, true)
         }
-        (ctx.events.on_tool_call_completed)(tool, output)
+        let output = (ctx.events.on_tool_call_completed)(tool, output)
         ctx.prompt = ctx.prompt.append(
           @prompt.Message::tool_result(tool~, output~, id~, is_error=failed),
         )
@@ -587,14 +620,7 @@ async fn run_node(
     }
     NodeLLMSendToolResult => {
       charge_llm(ctx)
-      (ctx.events.on_llm_call_starting)(ctx.prompt)
-      let reply = ctx.executor.execute(
-        prompt=ctx.prompt,
-        model=ctx.model,
-        tools=ctx.descriptors,
-      )
-      (ctx.events.on_llm_call_completed)(reply)
-      VReply(reply)
+      VReply(call_llm(ctx, ctx.prompt, ctx.descriptors))
     }
     NodeLLMRequestWith(instruction) => {
       // Keep the previous reply in the conversation, then nudge and re-request.
@@ -603,28 +629,30 @@ async fn run_node(
       }
       ctx.prompt = ctx.prompt.append(@prompt.Message::user(instruction))
       charge_llm(ctx)
-      (ctx.events.on_llm_call_starting)(ctx.prompt)
-      let reply = ctx.executor.execute(
-        prompt=ctx.prompt,
-        model=ctx.model,
-        tools=ctx.descriptors,
-      )
-      (ctx.events.on_llm_call_completed)(reply)
-      VReply(reply)
+      VReply(call_llm(ctx, ctx.prompt, ctx.descriptors))
     }
     NodeCustom(key) =>
       match strategy.custom.get(key) {
         Some(handler) => handler({ ctx, }, value)
         None => value
       }
-    NodeSubgraph(sub) => run_graph(ctx, sub, value)
+    NodeSubgraph(sub) => {
+      (ctx.events.on_subgraph_execution_starting)(sub.name)
+      let out = run_graph(ctx, sub, value)
+      (ctx.events.on_subgraph_execution_completed)(sub.name, out.text())
+      out
+    }
     NodeSubgraphRetry(sub, until~, max_retries~) => {
+      (ctx.events.on_subgraph_execution_starting)(sub.name)
       let mut out = run_graph(ctx, sub, value)
       let mut left = max_retries
       while left > 0 && !until(out) {
         out = run_graph(ctx, sub, value)
         left = left - 1
       }
+      // Once, on the attempt that was kept: the discarded attempts are the retry's business,
+      // not a caller counting subgraph runs.
+      (ctx.events.on_subgraph_execution_completed)(sub.name, out.text())
       out
     }
     NodeParallel(names, merge~) => {
@@ -657,30 +685,35 @@ async fn run_node(
         params: { ..ctx.prompt.params, number_of_choices: Some(choices), },
       }
       charge_llm(ctx)
-      (ctx.events.on_llm_call_starting)(ask)
+      let ask = (ctx.events.on_llm_call_starting)(ask)
       let candidates = ctx.executor.execute_multiple(
         prompt=ask,
         model=ctx.model,
         tools=ctx.descriptors,
       )
       let picked = selector.choose(ask, candidates)
-      (ctx.events.on_llm_call_completed)(picked)
-      VReply(picked)
+      VReply((ctx.events.on_llm_call_completed)(picked))
     }
     NodeModerate =>
       VModeration(ctx.executor.moderate(prompt=ctx.prompt, model=ctx.model))
     NodeLLMRequestStreaming(on_chunk) => {
       ctx.prompt = ctx.prompt.append(@prompt.Message::user(value.text()))
       charge_llm(ctx)
-      (ctx.events.on_llm_call_starting)(ctx.prompt)
+      // A streamed call goes through the LLM interceptors too, so a prompt rewrite installed
+      // once holds whether or not the node happens to stream.
+      let ask = (ctx.events.on_llm_call_starting)(ctx.prompt)
+      (ctx.events.on_llm_streaming_starting)(ask)
       let reply = ctx.executor.execute_streaming(
-        prompt=ctx.prompt,
+        prompt=ask,
         model=ctx.model,
         tools=ctx.descriptors,
-        on_chunk~,
+        on_chunk=chunk => {
+          (ctx.events.on_llm_streaming_frame)(chunk)
+          on_chunk(chunk)
+        },
       )
-      (ctx.events.on_llm_call_completed)(reply)
-      VReply(reply)
+      (ctx.events.on_llm_streaming_completed)(reply)
+      VReply((ctx.events.on_llm_call_completed)(reply))
     }
     NodeLLMRequestStructured(schema, fixes~) => {
       ctx.prompt = {
@@ -693,13 +726,7 @@ async fn run_node(
       )
       for attempt = 0; attempt <= fixes; attempt = attempt + 1 {
         charge_llm(ctx)
-        (ctx.events.on_llm_call_starting)(ctx.prompt)
-        let reply = ctx.executor.execute(
-          prompt=ctx.prompt,
-          model=ctx.model,
-          tools=ctx.descriptors,
-        )
-        (ctx.events.on_llm_call_completed)(reply)
+        let reply = call_llm(ctx, ctx.prompt, ctx.descriptors)
         let text = reply.text_content()
         let parsed = if extract_json_object(text) is Some(js) {
           (schema.parse)(@json.parse(js) catch { _ => Json::null() })
@@ -717,6 +744,31 @@ async fn run_node(
         (fixes + 1).to_string() +
         " attempts",
       )
+    }
+  }
+}
+
+///|
+/// Run one node with the run's node hooks around it: started, then either completed or failed
+/// with the error that is about to end the run. The error carries on unchanged — the hook
+/// watches, it does not recover.
+async fn run_node_hooked(
+  ctx : StrategyContext,
+  strategy : AIAgentStrategy,
+  name : String,
+  kind : NodeKind,
+  value : NodeValue,
+) -> NodeValue {
+  (ctx.events.on_node_execution_starting)(name)
+  let out = Ok(run_node(ctx, strategy, kind, value)) catch { e => Err(e) }
+  match out {
+    Ok(v) => {
+      (ctx.events.on_node_execution_completed)(name)
+      v
+    }
+    Err(e) => {
+      (ctx.events.on_node_execution_failed)(name, error_text(e))
+      raise e
     }
   }
 }
@@ -779,9 +831,7 @@ async fn run_graph(
     if top && ctx.checkpoint is Some(cp) {
       snapshot(ctx, cp, current, value)
     }
-    (ctx.events.on_node_execution_starting)(current)
-    let out = run_node(ctx, strategy, kind, value)
-    (ctx.events.on_node_execution_completed)(current)
+    let out = run_node_hooked(ctx, strategy, current, kind, value)
     if current == strategy.finish {
       return out
     }
@@ -863,7 +913,18 @@ pub async fn AIAgent::run_strategy(
     checkpoint: checkpoints,
   }
   (self.events.on_agent_starting)(input)
-  let result = run_graph(ctx, strategy, value, at~, top=true).text()
+  (self.events.on_strategy_starting)(strategy.name)
+  let walked = Ok(run_graph(ctx, strategy, value, at~, top=true)) catch {
+    e => Err(e)
+  }
+  let result = match walked {
+    Ok(v) => v.text()
+    Err(e) => {
+      (self.events.on_agent_execution_failed)(error_text(e))
+      raise e
+    }
+  }
+  (self.events.on_strategy_completed)(strategy.name, result)
   (self.events.on_agent_completed)(result)
   result
 }

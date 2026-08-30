@@ -30,6 +30,7 @@ fn main {
       ToolCall(id=Some("call_66666"), tool="lookup", args={ "q": "hhh" }),
     ],
     finish_reason: Some("tool_calls"),
+    meta: None,
   }
   println("reply parts: \{reply.parts.length()}")
   println("reply text: \{reply.text_content()}")

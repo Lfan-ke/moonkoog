@@ -13,6 +13,7 @@ async test "strategy: an edge routes to finish on a specific named tool call" {
         }),
       ],
       finish_reason: None,
+      meta: None,
     }
     let mock = @agent.MockClient::new([reply])
     let strat = @agent.AIAgentStrategy::new("exit_test")
