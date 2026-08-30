@@ -1,6 +1,6 @@
 name = "Lfan-ke/moonkoog"
 
-version = "0.3.1"
+version = "0.4.0"
 
 readme = "README.md"
 
