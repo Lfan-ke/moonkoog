@@ -5,7 +5,7 @@ pub(all) enum Role {
   System
   User
   Assistant
-} derive(Eq, Debug, ToJson)
+} derive(Eq, Debug, ToJson, FromJson)
 
 ///|
 /// One typed piece of a message's content. Koog 1.1.1 moved off flat string
@@ -17,7 +17,7 @@ pub(all) enum MessagePart {
   Reasoning(Array[String])
   ToolCall(id~ : String?, tool~ : String, args~ : Json)
   ToolResult(id~ : String?, tool~ : String, output~ : String, is_error~ : Bool)
-} derive(Eq, Debug, ToJson)
+} derive(Eq, Debug, ToJson, FromJson)
 
 ///|
 /// A single message: a role and its ordered content parts. `finish_reason` is the
@@ -26,7 +26,7 @@ pub(all) struct Message {
   role : Role
   parts : Array[MessagePart]
   finish_reason : String?
-} derive(Eq, Debug, ToJson)
+} derive(Eq, Debug, ToJson, FromJson)
 
 ///|
 /// A plain system message.

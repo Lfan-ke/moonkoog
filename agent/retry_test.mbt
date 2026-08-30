@@ -1,5 +1,6 @@
-// The retrying client: a client that fails a scripted number of times then succeeds proves
-// the retry re-runs `execute` and gives up at `max_attempts`.
+// The retrying client: a client that fails a scripted number of times with a scripted message
+// proves the retry re-runs `execute`, waits between attempts, gives up at `max_attempts`, and
+// leaves an error the provider will answer the same way alone.
 
 ///|
 suberror FlakyError {
@@ -7,9 +8,27 @@ suberror FlakyError {
 }
 
 ///|
+/// A caught `Error` says only its own type name, so the retry is told how to read this one.
+fn describe_flaky(error : Error) -> String {
+  match error {
+    FlakyError(message) => message
+    _ => @agent.default_describe(error)
+  }
+}
+
+///|
 struct FlakyClient {
   mut calls : Int
   fail_times : Int
+  message : String
+}
+
+///|
+fn FlakyClient::new(
+  fail_times~ : Int,
+  message? : String = "503 service temporarily unavailable",
+) -> FlakyClient {
+  { calls: 0, fail_times, message, }
 }
 
 ///|
@@ -24,7 +43,7 @@ impl @agent.LLMClient for FlakyClient with fn execute(
   let _ = tools
   self.calls = self.calls + 1
   if self.calls <= self.fail_times {
-    raise FlakyError("transient failure")
+    raise FlakyError(self.message)
   }
   @prompt.Message::assistant("ok")
 }
@@ -54,10 +73,22 @@ impl @agent.LLMClient for FlakyClient with fn execute_multiple(
 }
 
 ///|
+/// A config that waits the default 1s/2s/... but with the jitter switched off, so a test can
+/// name the exact delays.
+fn steady_config() -> @agent.RetryConfig {
+  { ..@agent.RetryConfig::default(), jitter_factor: 0.0, }
+}
+
+///|
 async test "retrying client: retries a transient failure and eventually succeeds" {
   @async.with_task_group(_g => {
-    let flaky = FlakyClient::{ calls: 0, fail_times: 2, }
-    let client = @agent.RetryingClient::new(flaky, max_attempts=3)
+    let flaky = FlakyClient::new(fail_times=2)
+    let client = @agent.RetryingClient::new(
+      flaky,
+      describe=describe_flaky,
+      config=steady_config(),
+      wait=_ms => (),
+    )
     let prompt = @prompt.PromptBuilder::new().user("hi").build()
     let reply = @agent.LLMClient::execute(
       client,
@@ -73,8 +104,13 @@ async test "retrying client: retries a transient failure and eventually succeeds
 ///|
 async test "retrying client: gives up after max_attempts" {
   @async.with_task_group(_g => {
-    let flaky = FlakyClient::{ calls: 0, fail_times: 5, }
-    let client = @agent.RetryingClient::new(flaky, max_attempts=2)
+    let flaky = FlakyClient::new(fail_times=5)
+    let client = @agent.RetryingClient::new(
+      flaky,
+      describe=describe_flaky,
+      config={ ..steady_config(), max_attempts: 2, },
+      wait=_ms => (),
+    )
     let prompt = @prompt.PromptBuilder::new().user("hi").build()
     let failed = try {
       let _ = @agent.LLMClient::execute(
@@ -89,5 +125,176 @@ async test "retrying client: gives up after max_attempts" {
     }
     assert_eq(failed, true)
     assert_eq(flaky.calls, 2)
+  })
+}
+
+///|
+async test "retrying client: a retryable failure backs off exponentially" {
+  @async.with_task_group(_g => {
+    // The clock is injected: the test observes the waits instead of living through them.
+    let waits = []
+    let flaky = FlakyClient::new(fail_times=2)
+    let client = @agent.RetryingClient::new(
+      flaky,
+      describe=describe_flaky,
+      config=steady_config(),
+      wait=ms => waits.push(ms),
+    )
+    let prompt = @prompt.PromptBuilder::new().user("hi").build()
+    let reply = @agent.LLMClient::execute(
+      client,
+      prompt~,
+      model=@llm.deepseek_v4_flash,
+      tools=[],
+    )
+    assert_eq(reply.text_content(), "ok")
+    assert_eq(waits, [1000, 2000])
+  })
+}
+
+///|
+async test "retrying client: the backoff is capped at max_delay_ms" {
+  @async.with_task_group(_g => {
+    let waits = []
+    let flaky = FlakyClient::new(fail_times=9)
+    let client = @agent.RetryingClient::new(
+      flaky,
+      describe=describe_flaky,
+      config={
+        ..steady_config(),
+        max_attempts: 6,
+        initial_delay_ms: 1000,
+        max_delay_ms: 4000,
+      },
+      wait=ms => waits.push(ms),
+    )
+    let prompt = @prompt.PromptBuilder::new().user("hi").build()
+    (@agent.LLMClient::execute(client, prompt~, model=@llm.deepseek_v4_flash, tools=[])
+    |> ignore) catch {
+      _ => ()
+    }
+    assert_eq(waits, [1000, 2000, 4000, 4000, 4000])
+  })
+}
+
+///|
+async test "retrying client: a non-retryable failure is not retried" {
+  @async.with_task_group(_g => {
+    let waits = []
+    let flaky = FlakyClient::new(fail_times=9, message="400 invalid request")
+    let client = @agent.RetryingClient::new(
+      flaky,
+      describe=describe_flaky,
+      config=steady_config(),
+      wait=ms => waits.push(ms),
+    )
+    let prompt = @prompt.PromptBuilder::new().user("hi").build()
+    let failed = try {
+      let _ = @agent.LLMClient::execute(
+        client,
+        prompt~,
+        model=@llm.deepseek_v4_flash,
+        tools=[],
+      )
+      false
+    } catch {
+      _ => true
+    }
+    assert_eq(failed, true)
+    // One attempt, and no wait: the provider would answer a 400 the same way every time.
+    assert_eq(flaky.calls, 1)
+    assert_eq(waits, [])
+  })
+}
+
+///|
+async test "retrying client: an explicit predicate overrides the pattern list" {
+  @async.with_task_group(_g => {
+    let flaky = FlakyClient::new(fail_times=1, message="400 invalid request")
+    let client = @agent.RetryingClient::new(
+      flaky,
+      describe=describe_flaky,
+      config=steady_config(),
+      retryable=Some(_e => true),
+      wait=_ms => (),
+    )
+    let prompt = @prompt.PromptBuilder::new().user("hi").build()
+    let reply = @agent.LLMClient::execute(
+      client,
+      prompt~,
+      model=@llm.deepseek_v4_flash,
+      tools=[],
+    )
+    assert_eq(reply.text_content(), "ok")
+    assert_eq(flaky.calls, 2)
+  })
+}
+
+///|
+test "retry config: which errors the default patterns claim" {
+  let config = @agent.RetryConfig::default()
+  assert_eq(
+    config.matches(describe_flaky(FlakyError("429 Too Many Requests"))),
+    true,
+  )
+  assert_eq(config.matches(describe_flaky(FlakyError("503 unavailable"))), true)
+  assert_eq(
+    config.matches(describe_flaky(FlakyError("Read TIMEOUT after 30s"))),
+    true,
+  )
+  assert_eq(
+    config.matches(describe_flaky(FlakyError("connection reset by peer"))),
+    true,
+  )
+  assert_eq(
+    config.matches(describe_flaky(FlakyError("400 invalid request"))),
+    false,
+  )
+  assert_eq(
+    config.matches(describe_flaky(FlakyError("401 unauthorized"))),
+    false,
+  )
+  assert_eq(
+    config.matches(describe_flaky(FlakyError("context length exceeded"))),
+    false,
+  )
+  // The disabled config claims nothing.
+  assert_eq(
+    @agent.RetryConfig::disabled().matches(describe_flaky(FlakyError("503"))),
+    false,
+  )
+}
+
+///|
+test "retry config: the nominal delay doubles up to its ceiling" {
+  let config = @agent.RetryConfig::default()
+  assert_eq(config.delay_ms(1), 1000)
+  assert_eq(config.delay_ms(2), 2000)
+  assert_eq(config.delay_ms(3), 4000)
+  assert_eq(config.delay_ms(20), 30000)
+}
+
+///|
+async test "retrying client: jitter keeps each wait within a tenth of nominal" {
+  @async.with_task_group(_g => {
+    let waits = []
+    let flaky = FlakyClient::new(fail_times=9)
+    let client = @agent.RetryingClient::new(
+      flaky,
+      describe=describe_flaky,
+      config={ ..@agent.RetryConfig::default(), max_attempts: 4, },
+      wait=ms => waits.push(ms),
+    )
+    let prompt = @prompt.PromptBuilder::new().user("hi").build()
+    (@agent.LLMClient::execute(client, prompt~, model=@llm.deepseek_v4_flash, tools=[])
+    |> ignore) catch {
+      _ => ()
+    }
+    assert_eq(waits.length(), 3)
+    assert_eq(waits[0] >= 900 && waits[0] <= 1100, true)
+    assert_eq(waits[1] >= 1800 && waits[1] <= 2200, true)
+    assert_eq(waits[2] >= 3600 && waits[2] <= 4400, true)
+    // Jitter means the waits are not all exactly nominal.
+    assert_eq(waits == [1000, 2000, 4000], false)
   })
 }

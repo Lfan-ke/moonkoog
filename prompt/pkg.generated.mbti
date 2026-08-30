@@ -3,6 +3,7 @@ package "Lfan-ke/moonkoog/prompt"
 
 import {
   "moonbitlang/core/debug",
+  "moonbitlang/core/json",
 }
 
 // Values
@@ -28,7 +29,7 @@ pub(all) struct Message {
   role : Role
   parts : Array[MessagePart]
   finish_reason : String?
-} derive(Eq, ToJson, @debug.Debug)
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
 pub fn Message::assistant(String) -> Self
 pub fn Message::system(String) -> Self
 pub fn Message::text_content(Self, separator? : String) -> String
@@ -41,7 +42,7 @@ pub(all) enum MessagePart {
   Reasoning(Array[String])
   ToolCall(id~ : String?, tool~ : String, args~ : Json)
   ToolResult(id~ : String?, tool~ : String, output~ : String, is_error~ : Bool)
-} derive(Eq, ToJson, @debug.Debug)
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
 
 pub(all) struct Prompt {
   messages : Array[Message]
@@ -68,7 +69,7 @@ pub(all) enum Role {
   System
   User
   Assistant
-} derive(Eq, ToJson, @debug.Debug)
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
 
 pub(all) enum Schema {
   JsonBasic(name~ : String, schema~ : Json)

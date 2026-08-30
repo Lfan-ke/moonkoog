@@ -101,11 +101,22 @@ pub impl LLMClient for MockClient with fn moderate(self, prompt~, model~) {
 }
 
 ///|
+/// The scripted equivalent of a multi-choice request: hand back the next
+/// `prompt.params.number_of_choices` scripted replies, one per candidate, the way a
+/// provider returns one completion per requested choice.
 pub impl LLMClient for MockClient with fn execute_multiple(
   self,
   prompt~,
   model~,
   tools~,
 ) {
-  [self.execute(prompt~, model~, tools~)]
+  let wanted = match prompt.params.number_of_choices {
+    Some(n) => if n > 1 { n } else { 1 }
+    None => 1
+  }
+  let choices = []
+  for _ in 0..<wanted {
+    choices.push(LLMClient::execute(self, prompt~, model~, tools~))
+  }
+  choices
 }

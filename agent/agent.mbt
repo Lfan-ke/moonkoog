@@ -41,28 +41,42 @@ pub fn RunHandle::stopping(self : RunHandle) -> Bool {
 /// A single-run agent — Koog's `AIAgent` as built by its ergonomic factory over
 /// the default `singleRunStrategy`. It pairs an LLM executor + model with a tool
 /// registry and an optional system prompt, and runs the tool-calling loop.
-/// Source: agents/agents-core/.../agent/{AIAgent,AIAgentFactory}.kt.
+/// `params` is what Koog's `AIAgentConfig` carries inside its whole `Prompt`:
+/// every request a run makes starts from it, so temperature, tool choice, token
+/// cap and the rest reach the provider.
+/// Source: agents/agents-core/.../agent/{AIAgent,AIAgentFactory,AIAgentConfig}.kt.
 pub struct AIAgent {
   executor : &LLMClient
   model : @llm.LLModel
   tool_registry : @tools.ToolRegistry
   system_prompt : String?
+  params : @prompt.LLMParams
   max_iterations : Int
   events : EventHandler
 }
 
 ///|
-/// Build an agent. `max_iterations` defaults to Koog's 50; `events` defaults to a
-/// no-op handler (install one to observe the run).
+/// Build an agent. `params` defaults to the provider's own defaults (Koog's empty
+/// `LLMParams`); `max_iterations` to Koog's 50; `events` to a no-op handler
+/// (install one to observe the run).
 pub fn AIAgent::new(
   executor : &LLMClient,
   model~ : @llm.LLModel,
   tool_registry? : @tools.ToolRegistry = @tools.ToolRegistry::new(),
   system_prompt? : String? = None,
+  params? : @prompt.LLMParams = @prompt.LLMParams::default(),
   max_iterations? : Int = 50,
   events? : EventHandler = EventHandler::new(),
 ) -> AIAgent {
-  { executor, model, tool_registry, system_prompt, max_iterations, events, }
+  {
+    executor,
+    model,
+    tool_registry,
+    system_prompt,
+    params,
+    max_iterations,
+    events,
+  }
 }
 
 ///|
@@ -80,6 +94,14 @@ pub async fn AIAgent::run(
   self : AIAgent,
   input : String,
   stop? : RunHandle,
+  checkpoints? : Checkpointer,
+  resume_from? : AgentCheckpoint,
 ) -> String {
-  self.run_strategy(single_run_strategy(), input, stop?)
+  self.run_strategy(
+    single_run_strategy(),
+    input,
+    stop?,
+    checkpoints?,
+    resume_from?,
+  )
 }

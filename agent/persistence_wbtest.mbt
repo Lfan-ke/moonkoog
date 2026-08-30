@@ -1,4 +1,4 @@
-// Agent checkpointing and persistence (Koog `agents-features-snapshot`).
+// Agent checkpointing (Koog `agents-features-snapshot`).
 
 ///|
 test "persistence: save, list, latest-by-time, and storage snapshot round-trip" {
@@ -6,19 +6,14 @@ test "persistence: save, list, latest-by-time, and storage snapshot round-trip" 
   let storage = AgentStorage::new()
   storage.set("step", 3)
   storage.set("goal", "answer")
-  let checkpoint : AgentCheckpoint = {
-    checkpoint_id: "cp-1",
-    created_at: 1000L,
-    message_history: [@prompt.Message::user("hello")],
-    llm_params: None,
-    llm_model: None,
-    tools: None,
-    storage: storage.snapshot(),
-    node_path: "node.call_llm",
-    last_output: None,
-    agent_iterations: 2,
-    version: 1L,
-  }
+  let checkpoint : AgentCheckpoint = AgentCheckpoint::new(
+    checkpoint_id="cp-1",
+    created_at=1000L,
+    node_id="call_llm",
+    message_history=[@prompt.Message::user("hello")],
+    storage=storage.snapshot(),
+    agent_iterations=2,
+  )
   let provider = InMemoryPersistence::new()
   provider.save_checkpoint("s1", checkpoint)
   // A later checkpoint at the same session.
@@ -26,7 +21,7 @@ test "persistence: save, list, latest-by-time, and storage snapshot round-trip" 
     ..checkpoint,
     checkpoint_id: "cp-2",
     created_at: 2000L,
-    node_path: "node.finish",
+    node_id: "__finish__",
   }
   provider.save_checkpoint("s1", checkpoint2)
   assert_eq(provider.get_checkpoints("s1").length(), 2)
@@ -37,7 +32,7 @@ test "persistence: save, list, latest-by-time, and storage snapshot round-trip" 
     fail("expected a latest checkpoint")
   }
   assert_eq(latest.checkpoint_id, "cp-2")
-  assert_eq(latest.node_path, "node.finish")
+  assert_eq(latest.node_id, "__finish__")
   assert_eq(latest.agent_iterations, 2)
   // Restoring an agent storage from a checkpoint's snapshot recovers its typed values.
   let restored = AgentStorage::new()

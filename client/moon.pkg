@@ -15,3 +15,11 @@ import {
   "DC-Z-lab/moonllm",
   "moonbitlang/core/json",
 }
+
+import {
+  "Lfan-ke/moonkoog/prompt",
+  "Lfan-ke/moonkoog/llm",
+  "Lfan-ke/moonkoog/agent",
+  "DC-Z-lab/moonllm",
+  "moonbitlang/async",
+} for "test"

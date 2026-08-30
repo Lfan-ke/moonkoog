@@ -70,32 +70,63 @@ fn extract_json_object(text : String) -> String? {
 }
 
 ///|
+/// The instruction that pins a reply to `schema`'s JSON shape — shared by the agent-level
+/// request and by the graph's structured node.
+fn[T] schema_instruction(schema : StructuredSchema[T]) -> String {
+  "Respond with a single JSON object and nothing else — no prose, no code fences. It must match this JSON schema for \"" +
+  schema.name +
+  "\" (" +
+  schema.description +
+  "): " +
+  schema.schema.to_json_schema().stringify()
+}
+
+///|
+/// What a malformed reply is answered with before asking again (Koog's
+/// `StructureFixingParser`).
+let fix_instruction : String = "That was not a valid JSON object matching the schema. Respond again with only the JSON object."
+
+///|
+/// `params` with `schema` set as the provider's own structured-output format, in the richest
+/// dialect the model declares — Koog's native structured output, which a client turns into an
+/// OpenAI `response_format` (see `to_llm_response_format`). A model declaring neither JSON-schema
+/// capability is left alone: for it the schema instruction in the prompt is the whole mechanism,
+/// which is Koog's manual mode.
+fn[T] with_schema(
+  params : @prompt.LLMParams,
+  model : @llm.LLModel,
+  schema : StructuredSchema[T],
+) -> @prompt.LLMParams {
+  let json = schema.schema.to_json_schema()
+  if model.supports(SchemaJsonStandard) {
+    { ..params, schema: Some(JsonStandard(name=schema.name, schema=json)), }
+  } else if model.supports(SchemaJsonBasic) {
+    { ..params, schema: Some(JsonBasic(name=schema.name, schema=json)), }
+  } else {
+    params
+  }
+}
+
+///|
 /// Request a structured response to `input`, retrying up to `max_fixes` times when
-/// the reply does not parse. Seeds the prompt with a schema instruction (after the
-/// agent's system prompt), then on each malformed reply appends the bad output and
-/// a fixing instruction and asks again — Koog's `StructureFixingParser`. Raises
-/// `AgentError` if no reply parses within the budget.
+/// the reply does not parse. Asks through the provider's own structured-output format when
+/// the model declares a JSON-schema capability, and states the schema in the prompt as well,
+/// so a provider that ignores `response_format` still has the shape in front of it. On each
+/// malformed reply it appends the bad output and a fixing instruction and asks again — Koog's
+/// `StructureFixingParser`. Raises `AgentError` if no reply parses within the budget.
 pub async fn[T] AIAgent::request_structured(
   self : AIAgent,
   input : String,
   schema : StructuredSchema[T],
   max_fixes? : Int = 2,
 ) -> StructuredResponse[T] {
-  let builder = @prompt.PromptBuilder::new()
+  let builder = @prompt.PromptBuilder::new(
+    params=with_schema(self.params, self.model, schema),
+  )
   if self.system_prompt is Some(sp) {
     builder.system(sp) |> ignore
   }
-  builder
-  .system(
-    "Respond with a single JSON object and nothing else — no prose, no code fences. It must match this JSON schema for \"" +
-    schema.name +
-    "\" (" +
-    schema.description +
-    "): " +
-    schema.schema.to_json_schema().stringify(),
-  )
-  .user(input)
-  |> ignore
+  builder.system(schema_instruction(schema)).user(input) |> ignore
   let mut prompt = builder.build()
   let descriptors = self.tool_registry.descriptors()
   for _attempt = 0; _attempt <= max_fixes; _attempt = _attempt + 1 {
@@ -114,11 +145,7 @@ pub async fn[T] AIAgent::request_structured(
       return { value, raw: text, }
     }
     prompt = prompt.append(reply)
-    prompt = prompt.append(
-      @prompt.Message::user(
-        "That was not a valid JSON object matching the schema. Respond again with only the JSON object.",
-      ),
-    )
+    prompt = prompt.append(@prompt.Message::user(fix_instruction))
   }
   raise AgentError(
     "no valid structured response after " +

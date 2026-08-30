@@ -4,6 +4,7 @@ import {
   "Lfan-ke/moonkoog/agent",
   "Lfan-ke/moonkoog/prompt",
   "Lfan-ke/moonkoog/llm",
+  "moonbitlang/async",
 }
 
 pkgtype(kind: "executable")

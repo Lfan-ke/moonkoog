@@ -4,18 +4,17 @@ fn checkpoint(
   at : Int64,
   input : String,
 ) -> @persistence.AgentCheckpoint {
-  {
-    checkpoint_id: id,
-    created_at: at,
-    message_history: [
+  @persistence.AgentCheckpoint::new(
+    checkpoint_id=id,
+    created_at=at,
+    node_id="llm_request",
+    message_history=[
       @prompt.Message::user(input),
       @prompt.Message::assistant("acknowledged: " + input),
     ],
-    node_id: Some("llm_request"),
-    last_input: Some(input),
-    agent_iterations: 1,
-    version: 1L,
-  }
+    last_input=Some(Json::string(input)),
+    agent_iterations=1,
+  )
 }
 
 ///|

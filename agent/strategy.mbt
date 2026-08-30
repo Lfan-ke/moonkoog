@@ -6,33 +6,87 @@
 /// value from the start node along the first outgoing edge whose condition holds,
 /// node to node, until it reaches the finish node.
 ///
-/// Koog's nodes are statically typed on their input/output and its edges carry
-/// arbitrary transform lambdas; MoonBit has neither per-node generics across a
-/// heterogeneous graph nor a receiver-lambda DSL, so the value in flight is the
-/// `NodeValue` sum and the standard node behaviours are named `NodeKind`s.
-/// Arbitrary nodes are `NodeCustom` handlers run against a `NodeSession` — the
-/// MoonBit-idiomatic stand-in for Kotlin's receiver-lambda node DSL — and edges may
-/// carry a value transform, together enough to express Koog's chat and reAct strategies.
+/// Koog's nodes are statically typed on their input/output; MoonBit has no per-node
+/// generics across a heterogeneous graph, so the value in flight is the `NodeValue`
+/// sum and the standard node behaviours are named `NodeKind`s. Arbitrary nodes are
+/// `NodeCustom` handlers run against a `NodeSession` — the MoonBit-idiomatic stand-in
+/// for Kotlin's receiver-lambda node DSL. Edge conditions and edge transforms take
+/// arbitrary functions, as Koog's `onCondition { }` and `transformed { }` do.
+///
+/// A whole strategy nests as one node (`NodeSubgraph`, Koog's `subgraph`), with a
+/// retrying form (`NodeSubgraphRetry`, Koog's `SubgraphWithRetry`), and several nodes
+/// run at once and merge (`NodeParallel`, Koog's `parallel`).
 /// Source: agents/agents-core/.../agent/entity/{AIAgentStrategy,AIAgentNode,
 /// AIAgentEdge}.kt and AIAgentSimpleStrategies.kt (`singleRunStrategy`).
 
 ///|
 /// The value passed between strategy nodes: the text that enters at the start and
-/// leaves at the finish, an LLM assistant reply, or a bare token from a node whose
-/// effect is on the conversation (tools executed) rather than on a carried value.
+/// leaves at the finish, an LLM assistant reply, the JSON a structured request
+/// parsed, a moderation verdict, or a bare token from a node whose effect is on the
+/// conversation (tools executed) rather than on a carried value.
 pub(all) enum NodeValue {
   VText(String)
   VReply(@prompt.Message)
+  VJson(Json)
+  VModeration(ModerationResult)
   VUnit
 } derive(Eq, Debug)
 
 ///|
-/// The text a `NodeValue` carries: the raw text, an assistant reply's text, or empty.
+/// The text a `NodeValue` carries: the raw text, an assistant reply's text, the JSON
+/// re-serialized, a moderation verdict as `harmful` / `safe`, or empty.
 pub fn NodeValue::text(self : NodeValue) -> String {
   match self {
     VText(s) => s
     VReply(m) => m.text_content()
+    VJson(j) => j.stringify()
+    VModeration(r) => if r.is_harmful { "harmful" } else { "safe" }
     VUnit => ""
+  }
+}
+
+///|
+/// The value as Json, tagged by variant, so a checkpoint can carry what was in flight
+/// between two nodes.
+pub fn NodeValue::to_json(self : NodeValue) -> Json {
+  match self {
+    VText(s) => { "kind": "text", "value": s.to_json() }
+    VReply(m) => { "kind": "reply", "value": m.to_json() }
+    VJson(j) => { "kind": "json", "value": j }
+    VModeration(r) => { "kind": "moderation", "value": ToJson::to_json(r) }
+    VUnit => { "kind": "unit" }
+  }
+}
+
+///|
+/// Read back a value written by `to_json`. Raises `AgentError` on a tag or payload that does
+/// not belong to a `NodeValue` — a checkpoint that cannot be decoded cannot be resumed from,
+/// and saying so beats resuming at the right node with the wrong value.
+pub fn NodeValue::from_json(json : Json) -> NodeValue raise AgentError {
+  guard json is Object(fields) else {
+    raise AgentError("checkpoint value is not a JSON object")
+  }
+  guard fields.get("kind") is Some(String(kind)) else {
+    raise AgentError("checkpoint value has no 'kind'")
+  }
+  let payload = fields.get("value").unwrap_or(Json::null())
+  match kind {
+    "unit" => VUnit
+    "json" => VJson(payload)
+    "text" =>
+      match payload {
+        String(s) => VText(s)
+        _ => raise AgentError("checkpoint text value is not a string")
+      }
+    "reply" =>
+      VReply(@json.from_json(payload)) catch {
+        _ => raise AgentError("checkpoint reply value is not a message")
+      }
+    "moderation" =>
+      VModeration(@json.from_json(payload)) catch {
+        _ => raise AgentError("checkpoint moderation value is not a verdict")
+      }
+    _ => raise AgentError("unknown checkpoint value kind '" + kind + "'")
   }
 }
 
@@ -56,19 +110,50 @@ pub(all) enum NodeKind {
   // MoonBit-idiomatic stand-in for Kotlin's receiver-lambda session, giving closures the
   // request/append/storage operations a custom node needs (e.g. reAct's reasoning steps).
   NodeCustom(String)
-} derive(Eq, Debug)
+  // A whole strategy nested as one node (Koog's `subgraph`): its graph is walked with the
+  // same conversation, tool registry and budgets, and its finish value is this node's output.
+  NodeSubgraph(AIAgentStrategy)
+  // A subgraph re-run until `until` accepts its result, at most `max_retries` extra times
+  // (Koog's `SubgraphWithRetry`). Attempts share the conversation, so a retry sees what the
+  // failed one produced; the last attempt's value is the output when none is accepted.
+  NodeSubgraphRetry(
+    AIAgentStrategy,
+    until~ : (NodeValue) -> Bool,
+    max_retries~ : Int
+  )
+  // Several of this strategy's nodes run at once on the same input, their results merged
+  // into one value (Koog's `parallel`). Each branch runs on a forked conversation so the
+  // branches cannot interleave into one another's prompt; the parent's conversation is
+  // unchanged and the merged value is what flows on.
+  NodeParallel(Array[String], merge~ : (Array[NodeValue]) -> NodeValue)
+  // Ask the provider for `choices` candidate replies (`execute_multiple`, Koog
+  // `executeMultipleChoices`) and pick one with a `ChoiceSelectionStrategy`.
+  NodeLLMRequestMultiple(&ChoiceSelectionStrategy, choices~ : Int)
+  // Run the conversation so far through the provider's safety endpoint
+  // (`LLMClient.moderate`), carrying the verdict on as a `VModeration`.
+  NodeModerate
+  // Request the model with the reply streamed, handing each incremental text delta to
+  // `on_chunk` as it arrives (`execute_streaming`, Koog `LLMClient.executeStreaming`).
+  NodeLLMRequestStreaming((String) -> Unit)
+  // Request a reply constrained to a schema and carry the parsed JSON on as a `VJson`
+  // (Koog `requestLLMStructured`). A reply that does not parse is re-asked up to `fixes`
+  // times, Koog's `StructureFixingParser`.
+  NodeLLMRequestStructured(StructuredSchema[Json], fixes~ : Int)
+}
 
 ///|
 /// When an edge fires, tested against the source node's output. `Always` is an
 /// unconditional edge; `OnAssistantMessage` fires on a plain-text reply (no tool
-/// calls); `OnToolCalls` fires on a reply that requests tools. Koog's `onCondition`
-/// / `onAssistantMessage` / `onToolCall`.
+/// calls); `OnToolCalls` fires on a reply that requests tools; `OnPredicate` fires
+/// on any test of the value at all. Koog's `onCondition` / `onAssistantMessage` /
+/// `onToolCall`.
 pub(all) enum EdgeCondition {
   Always
   OnAssistantMessage
   OnToolCalls
   OnToolNamed(String)
-} derive(Eq, Debug)
+  OnPredicate((NodeValue) -> Bool)
+}
 
 ///|
 /// A directed edge `from -> to` that fires when `condition` holds.
@@ -76,11 +161,12 @@ pub(all) struct StrategyEdge {
   from : String
   to : String
   condition : EdgeCondition
-  // When set, the value carried to `to` is replaced by this text (Koog's edge
-  // `transformed { ... }`) — e.g. the chat strategy finishing on the exit tool with
-  // "Chat finished" rather than the tool call.
-  transform : String?
-} derive(Eq, Debug)
+  // When set, the value carried to `to` is what this returns for the source node's output
+  // (Koog's edge `transformed { ... }`) — e.g. the chat strategy finishing on the exit tool
+  // with "Chat finished" rather than the tool call. Synchronous: a step that has to reach
+  // the model is a node, not an edge.
+  transform : ((NodeValue) -> NodeValue)?
+}
 
 ///|
 /// A strategy graph: named nodes, edges between them, and the start / finish node
@@ -147,14 +233,56 @@ pub fn AIAgentStrategy::custom_node(
 }
 
 ///|
+/// Add node `name` that runs the whole of `strategy` and carries its finish value on
+/// (Koog's `subgraph`). Returns the strategy so calls chain.
+pub fn AIAgentStrategy::subgraph(
+  self : AIAgentStrategy,
+  name : String,
+  strategy : AIAgentStrategy,
+) -> AIAgentStrategy {
+  self.nodes[name] = NodeSubgraph(strategy)
+  self
+}
+
+///|
+/// Add node `name` that runs `strategy` and re-runs it while `until` rejects the result,
+/// at most `max_retries` extra times (Koog's `SubgraphWithRetry`). Returns the strategy so
+/// calls chain.
+pub fn AIAgentStrategy::subgraph_retry(
+  self : AIAgentStrategy,
+  name : String,
+  strategy : AIAgentStrategy,
+  until~ : (NodeValue) -> Bool,
+  max_retries? : Int = 2,
+) -> AIAgentStrategy {
+  self.nodes[name] = NodeSubgraphRetry(strategy, until~, max_retries~)
+  self
+}
+
+///|
+/// Add node `name` that runs every node in `nodes` at once on the same input and hands
+/// their results, in that order, to `merge` (Koog's `parallel`). Returns the strategy so
+/// calls chain.
+pub fn AIAgentStrategy::parallel(
+  self : AIAgentStrategy,
+  name : String,
+  nodes : Array[String],
+  merge~ : (Array[NodeValue]) -> NodeValue,
+) -> AIAgentStrategy {
+  self.nodes[name] = NodeParallel(nodes, merge~)
+  self
+}
+
+///|
 /// Add an edge `from -> to` firing on `condition` (unconditional by default),
-/// returning the strategy so calls chain.
+/// returning the strategy so calls chain. `transform` rewrites the value the next
+/// node sees.
 pub fn AIAgentStrategy::edge(
   self : AIAgentStrategy,
   from : String,
   to : String,
   condition? : EdgeCondition = Always,
-  transform? : String? = None,
+  transform? : ((NodeValue) -> NodeValue)? = None,
 ) -> AIAgentStrategy {
   self.edges.push({ from, to, condition, transform, })
   self
@@ -199,7 +327,7 @@ pub fn chat_agent_strategy(max_steps? : Int = 1000) -> AIAgentStrategy {
     "send_tool_result",
     finish_node,
     condition=OnToolNamed("__exit__"),
-    transform=Some("Chat finished"),
+    transform=Some(_ => VText("Chat finished")),
   )
   .edge("send_tool_result", finish_node, condition=OnAssistantMessage)
   .edge("send_tool_result", "execute_tools", condition=OnToolCalls)
@@ -262,10 +390,36 @@ struct StrategyContext {
   mut prompt : @prompt.Prompt
   descriptors : Array[@tools.ToolDescriptor]
   events : EventHandler
-  // Custom-node handlers by name, and a small per-run integer store custom nodes use to
-  // carry state across the graph (e.g. reAct's reasoning-step counter).
-  custom : Map[String, async (NodeSession, NodeValue) -> NodeValue]
-  storage : Map[String, Int]
+  // The per-run `AIAgentStorage` custom nodes carry state through: any `ToJson` value, not
+  // just the counters reAct needs.
+  storage : AgentStorage
+  // The LLM-call budget. A cell rather than a field so a forked branch and every nested
+  // subgraph spend the one budget the agent was given, not a copy each.
+  llm_calls : Ref[Int]
+  max_iterations : Int
+  stop : RunHandle?
+  checkpoint : Checkpointer?
+}
+
+///|
+/// A branch context: its own conversation and per-run store, sharing the budget, so
+/// parallel branches cannot interleave into one another's prompt.
+fn StrategyContext::fork(self : StrategyContext) -> StrategyContext {
+  let storage = AgentStorage::new()
+  storage.restore(self.storage.snapshot())
+  { ..self, storage, }
+}
+
+///|
+/// Take one LLM call out of the run's budget, refusing past the agent's `max_iterations`
+/// (Koog's iteration cap).
+fn charge_llm(ctx : StrategyContext) -> Unit raise AgentError {
+  guard ctx.llm_calls.val < ctx.max_iterations else {
+    raise AgentError(
+      "max iterations (" + ctx.max_iterations.to_string() + ") exceeded",
+    )
+  }
+  ctx.llm_calls.val = ctx.llm_calls.val + 1
 }
 
 ///|
@@ -320,15 +474,30 @@ pub async fn NodeSession::request_llm_no_tools(
 }
 
 ///|
-/// Read a per-run counter (`None` if unset).
-pub fn NodeSession::get(self : NodeSession, key : String) -> Int? {
+/// The run's `AIAgentStorage` — what a node reaches for when it wants the whole store rather
+/// than one entry (`contains`, `remove`, a snapshot).
+pub fn NodeSession::storage(self : NodeSession) -> AgentStorage {
+  self.ctx.storage
+}
+
+///|
+/// Read the value stored under `key` at the type the call site asks for; `None` when the key
+/// is unset or its Json does not decode to that type.
+pub fn[T : @json.FromJson] NodeSession::get(
+  self : NodeSession,
+  key : String,
+) -> T? {
   self.ctx.storage.get(key)
 }
 
 ///|
-/// Write a per-run counter.
-pub fn NodeSession::set(self : NodeSession, key : String, value : Int) -> Unit {
-  self.ctx.storage[key] = value
+/// Store any `ToJson` value under `key`, replacing what was there.
+pub fn[T : ToJson] NodeSession::set(
+  self : NodeSession,
+  key : String,
+  value : T,
+) -> Unit {
+  self.ctx.storage.set(key, value)
 }
 
 ///|
@@ -365,23 +534,16 @@ fn edge_matches(condition : EdgeCondition, value : NodeValue) -> Bool {
         }
         _ => false
       }
+    OnPredicate(holds) => holds(value)
   }
 }
 
 ///|
-/// The text a `NodeValue` carries out of the finish node.
-fn node_value_text(value : NodeValue) -> String {
-  match value {
-    VText(s) => s
-    VReply(m) => m.text_content()
-    VUnit => ""
-  }
-}
-
-///|
-/// Run one node against the context, returning its output value.
+/// Run one node against the context, returning its output value. `strategy` is the graph
+/// the node belongs to — a subgraph node is dispatched against its own.
 async fn run_node(
   ctx : StrategyContext,
+  strategy : AIAgentStrategy,
   kind : NodeKind,
   value : NodeValue,
 ) -> NodeValue {
@@ -389,8 +551,9 @@ async fn run_node(
     NodeStart => value
     NodeFinish => value
     NodeLLMRequest => {
-      let input = node_value_text(value)
+      let input = value.text()
       ctx.prompt = ctx.prompt.append(@prompt.Message::user(input))
+      charge_llm(ctx)
       (ctx.events.on_llm_call_starting)(ctx.prompt)
       let reply = ctx.executor.execute(
         prompt=ctx.prompt,
@@ -423,6 +586,7 @@ async fn run_node(
       VUnit
     }
     NodeLLMSendToolResult => {
+      charge_llm(ctx)
       (ctx.events.on_llm_call_starting)(ctx.prompt)
       let reply = ctx.executor.execute(
         prompt=ctx.prompt,
@@ -438,6 +602,7 @@ async fn run_node(
         ctx.prompt = ctx.prompt.append(prev)
       }
       ctx.prompt = ctx.prompt.append(@prompt.Message::user(instruction))
+      charge_llm(ctx)
       (ctx.events.on_llm_call_starting)(ctx.prompt)
       let reply = ctx.executor.execute(
         prompt=ctx.prompt,
@@ -448,62 +613,177 @@ async fn run_node(
       VReply(reply)
     }
     NodeCustom(key) =>
-      match ctx.custom.get(key) {
+      match strategy.custom.get(key) {
         Some(handler) => handler({ ctx, }, value)
         None => value
       }
+    NodeSubgraph(sub) => run_graph(ctx, sub, value)
+    NodeSubgraphRetry(sub, until~, max_retries~) => {
+      let mut out = run_graph(ctx, sub, value)
+      let mut left = max_retries
+      while left > 0 && !until(out) {
+        out = run_graph(ctx, sub, value)
+        left = left - 1
+      }
+      out
+    }
+    NodeParallel(names, merge~) => {
+      let branches : Array[async () -> Result[NodeValue, Error]] = []
+      for name in names {
+        guard strategy.nodes.get(name) is Some(branch) else {
+          raise AgentError("parallel branch names no node '" + name + "'")
+        }
+        let ctx = ctx.fork()
+        branches.push(() => {
+          Ok(run_node(ctx, strategy, branch, value)) catch {
+            e => Err(e)
+          }
+        })
+      }
+      let results = []
+      for result in @async.all(branches[:]) {
+        match result {
+          Ok(v) => results.push(v)
+          Err(e) => raise e
+        }
+      }
+      merge(results)
+    }
+    NodeLLMRequestMultiple(selector, choices~) => {
+      ctx.prompt = ctx.prompt.append(@prompt.Message::user(value.text()))
+      // The candidate count rides on the prompt, which is where the provider reads it.
+      let ask = {
+        ..ctx.prompt,
+        params: { ..ctx.prompt.params, number_of_choices: Some(choices), },
+      }
+      charge_llm(ctx)
+      (ctx.events.on_llm_call_starting)(ask)
+      let candidates = ctx.executor.execute_multiple(
+        prompt=ask,
+        model=ctx.model,
+        tools=ctx.descriptors,
+      )
+      let picked = selector.choose(ask, candidates)
+      (ctx.events.on_llm_call_completed)(picked)
+      VReply(picked)
+    }
+    NodeModerate =>
+      VModeration(ctx.executor.moderate(prompt=ctx.prompt, model=ctx.model))
+    NodeLLMRequestStreaming(on_chunk) => {
+      ctx.prompt = ctx.prompt.append(@prompt.Message::user(value.text()))
+      charge_llm(ctx)
+      (ctx.events.on_llm_call_starting)(ctx.prompt)
+      let reply = ctx.executor.execute_streaming(
+        prompt=ctx.prompt,
+        model=ctx.model,
+        tools=ctx.descriptors,
+        on_chunk~,
+      )
+      (ctx.events.on_llm_call_completed)(reply)
+      VReply(reply)
+    }
+    NodeLLMRequestStructured(schema, fixes~) => {
+      ctx.prompt = {
+        ..ctx.prompt,
+        params: with_schema(ctx.prompt.params, ctx.model, schema),
+      }
+      ctx.prompt = ctx.prompt.append(@prompt.Message::user(value.text()))
+      ctx.prompt = ctx.prompt.append(
+        @prompt.Message::user(schema_instruction(schema)),
+      )
+      for attempt = 0; attempt <= fixes; attempt = attempt + 1 {
+        charge_llm(ctx)
+        (ctx.events.on_llm_call_starting)(ctx.prompt)
+        let reply = ctx.executor.execute(
+          prompt=ctx.prompt,
+          model=ctx.model,
+          tools=ctx.descriptors,
+        )
+        (ctx.events.on_llm_call_completed)(reply)
+        let text = reply.text_content()
+        let parsed = if extract_json_object(text) is Some(js) {
+          (schema.parse)(@json.parse(js) catch { _ => Json::null() })
+        } else {
+          None
+        }
+        if parsed is Some(value) {
+          return VJson(value)
+        }
+        ctx.prompt = ctx.prompt.append(reply)
+        ctx.prompt = ctx.prompt.append(@prompt.Message::user(fix_instruction))
+      }
+      raise AgentError(
+        "no valid structured response after " +
+        (fixes + 1).to_string() +
+        " attempts",
+      )
+    }
   }
 }
 
 ///|
-/// Run `strategy` on `input`, returning the finish node's text. Seeds the prompt
-/// with the agent's system message, then walks the graph: run the current node,
-/// follow the first outgoing edge whose condition holds, and stop at finish. LLM
-/// requests are bounded by the agent's `max_iterations` (Koog's iteration cap),
-/// node visits by the strategy's `max_steps`.
-pub async fn AIAgent::run_strategy(
-  self : AIAgent,
+/// File a checkpoint for the node `node` that is about to run on `value` — everything a resume
+/// needs: the conversation, the LLM configuration behind it, the serialized storage, the graph
+/// position and the LLM calls already spent. Resuming re-runs `node` on `value`, so the
+/// snapshot is taken before the node, never after.
+fn snapshot(
+  ctx : StrategyContext,
+  cp : Checkpointer,
+  node : String,
+  value : NodeValue,
+) -> Unit {
+  let created_at = cp.now()
+  cp.store.save_checkpoint(
+    cp.session,
+    @persistence.AgentCheckpoint::new(
+      checkpoint_id="cp-" + cp.seq.to_string(),
+      created_at~,
+      node_id=node,
+      message_history=[..ctx.prompt.messages],
+      llm_params=Some(ctx.prompt.params),
+      llm_model=Some(ctx.model),
+      tools=Some(ctx.descriptors.map(d => d.name)),
+      storage=ctx.storage.snapshot(),
+      last_input=Some(value.to_json()),
+      agent_iterations=ctx.llm_calls.val,
+    ),
+  )
+  cp.seq = cp.seq + 1
+}
+
+///|
+/// Walk `strategy` from `at` (its start node by default) on `input` and return the finish
+/// node's value: run the current node, follow the first outgoing edge whose condition holds,
+/// stop at finish. Recursive — a subgraph node walks its own graph through this same function,
+/// against the same context. Node visits are bounded by the strategy's `max_steps`; a
+/// stop asked for through the run's `RunHandle` is honoured between nodes, so the node
+/// in progress always finishes.
+///
+/// `top` marks the run's own graph. Only its boundaries are checkpointed: a node name is only
+/// meaningful inside the graph that declares it, and a resume re-enters the top-level walk.
+async fn run_graph(
+  ctx : StrategyContext,
   strategy : AIAgentStrategy,
-  input : String,
-  stop? : RunHandle,
-) -> String {
-  let builder = @prompt.PromptBuilder::new()
-  if self.system_prompt is Some(sp) {
-    builder.system(sp) |> ignore
-  }
-  let ctx : StrategyContext = {
-    executor: self.executor,
-    model: self.model,
-    tool_registry: self.tool_registry,
-    prompt: builder.build(),
-    descriptors: self.tool_registry.descriptors(),
-    events: self.events,
-    custom: strategy.custom,
-    storage: Map([]),
-  }
-  (self.events.on_agent_starting)(input)
-  for step = 0, current = strategy.start, value = VText(input), llm_calls = 0; step <
+  input : NodeValue,
+  at? : String? = None,
+  top? : Bool = false,
+) -> NodeValue {
+  for step = 0, current = at.unwrap_or(strategy.start), value = input; step <
      strategy.max_steps; {
-    if stop is Some(handle) && handle.stopping {
-      raise AgentStopped(node_value_text(value))
+    if ctx.stop is Some(handle) && handle.stopping {
+      raise AgentStopped(value.text())
     }
     guard strategy.nodes.get(current) is Some(kind) else {
       raise AgentError("strategy has no node named '" + current + "'")
     }
-    let is_llm = kind
-      is (NodeLLMRequest | NodeLLMSendToolResult | NodeLLMRequestWith(_))
-    guard !(is_llm && llm_calls >= self.max_iterations) else {
-      raise AgentError(
-        "max iterations (" + self.max_iterations.to_string() + ") exceeded",
-      )
+    if top && ctx.checkpoint is Some(cp) {
+      snapshot(ctx, cp, current, value)
     }
     (ctx.events.on_node_execution_starting)(current)
-    let out = run_node(ctx, kind, value)
+    let out = run_node(ctx, strategy, kind, value)
     (ctx.events.on_node_execution_completed)(current)
     if current == strategy.finish {
-      let result = node_value_text(out)
-      (self.events.on_agent_completed)(result)
-      return result
+      return out
     }
     guard strategy.edges
       .iter()
@@ -512,17 +792,10 @@ pub async fn AIAgent::run_strategy(
       raise AgentError("no edge out of '" + current + "' matched")
     }
     let carried = match edge.transform {
-      Some(t) => VText(t)
+      Some(rewrite) => rewrite(out)
       None => out
     }
-    continue step + 1,
-      edge.to,
-      carried,
-      if is_llm {
-        llm_calls + 1
-      } else {
-        llm_calls
-      }
+    continue step + 1, edge.to, carried
   }
   raise AgentError(
     "strategy '" +
@@ -531,4 +804,66 @@ pub async fn AIAgent::run_strategy(
     strategy.max_steps.to_string() +
     " node steps",
   )
+}
+
+///|
+/// Run `strategy` on `input`, returning the finish node's text. Seeds the prompt with the
+/// agent's `params` and system message, then walks the graph. LLM requests are bounded
+/// by the agent's `max_iterations` (Koog's iteration cap) across the whole run,
+/// nested subgraphs and parallel branches included; node visits by each strategy's
+/// `max_steps`.
+///
+/// With `checkpoints`, every top-level node boundary is snapshotted into the given store
+/// before the node runs. Passing one of those snapshots back as `resume_from` replays its
+/// conversation, storage and spent-iteration count and re-enters the walk at the node it was
+/// taken before, so a run picks up where it stopped instead of starting over; `input` is then
+/// unused, the value in flight coming from the checkpoint.
+pub async fn AIAgent::run_strategy(
+  self : AIAgent,
+  strategy : AIAgentStrategy,
+  input : String,
+  stop? : RunHandle,
+  checkpoints? : Checkpointer,
+  resume_from? : AgentCheckpoint,
+) -> String {
+  let storage = AgentStorage::new()
+  let (prompt, at, value, spent) = match resume_from {
+    Some(cp) => {
+      storage.restore(cp.storage)
+      let prompt : @prompt.Prompt = {
+        messages: [..cp.message_history],
+        id: "prompt",
+        params: cp.llm_params.unwrap_or(self.params),
+      }
+      let value = match cp.last_input {
+        Some(json) => NodeValue::from_json(json)
+        None => VUnit
+      }
+      (prompt, Some(cp.node_id), value, cp.agent_iterations)
+    }
+    None => {
+      let builder = @prompt.PromptBuilder::new(params=self.params)
+      if self.system_prompt is Some(sp) {
+        builder.system(sp) |> ignore
+      }
+      (builder.build(), None, VText(input), 0)
+    }
+  }
+  let ctx : StrategyContext = {
+    executor: self.executor,
+    model: self.model,
+    tool_registry: self.tool_registry,
+    prompt,
+    descriptors: self.tool_registry.descriptors(),
+    events: self.events,
+    storage,
+    llm_calls: Ref(spent),
+    max_iterations: self.max_iterations,
+    stop,
+    checkpoint: checkpoints,
+  }
+  (self.events.on_agent_starting)(input)
+  let result = run_graph(ctx, strategy, value, at~, top=true).text()
+  (self.events.on_agent_completed)(result)
+  result
 }

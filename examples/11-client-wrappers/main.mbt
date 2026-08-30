@@ -62,10 +62,20 @@ suberror Transient {
 }
 
 ///|
-/// A client that fails its first `fail_times` calls, then succeeds.
+/// A caught `Error` says only its own type name, so the retry is told how to read this one.
+fn describe_transient(error : Error) -> String {
+  match error {
+    Transient(message) => message
+    _ => @agent.default_describe(error)
+  }
+}
+
+///|
+/// A client that fails its first `fail_times` calls with `message`, then succeeds.
 struct Flaky {
   mut calls : Int
   fail_times : Int
+  message : String
 }
 
 ///|
@@ -75,7 +85,7 @@ impl @agent.LLMClient for Flaky with fn execute(self, prompt~, model~, tools~) {
   let _ = tools
   self.calls = self.calls + 1
   if self.calls <= self.fail_times {
-    raise Transient("transient failure")
+    raise Transient(self.message)
   }
   @prompt.Message::assistant("ok after retries")
 }
@@ -125,9 +135,19 @@ async fn main {
       "caching: inner calls=\{counter.calls}, cache size=\{cached.size()}",
     )
 
-    // Retry: two transient failures, then success on the third attempt.
-    let flaky = Flaky::{ calls: 0, fail_times: 2, }
-    let retrying = @agent.RetryingClient::new(flaky, max_attempts=3)
+    // Retry: two 503s, then success — each retry waited for, growing 1s -> 2s.
+    let waits = []
+    let flaky = Flaky::{
+      calls: 0,
+      fail_times: 2,
+      message: "503 service temporarily unavailable",
+    }
+    let retrying = @agent.RetryingClient::new(
+      flaky,
+      describe=describe_transient,
+      config={ ..@agent.RetryConfig::default(), jitter_factor: 0.0, },
+      wait=ms => waits.push(ms),
+    )
     let reply = @agent.LLMClient::execute(
       retrying,
       prompt=one_prompt(),
@@ -136,7 +156,29 @@ async fn main {
     ) catch {
       e => @prompt.Message::assistant("gave up: " + e.to_string())
     }
-    println("retry: attempts=\{flaky.calls}, reply=" + reply.text_content())
+    println(
+      "retry: attempts=\{flaky.calls}, backoff=" +
+      waits.map(ms => ms.to_string()).join("+") +
+      ", reply=" +
+      reply.text_content(),
+    )
+
+    // A 400 is the client's fault, not the provider's: asked again it fails the same way,
+    // so it is not retried at all.
+    let refused = Flaky::{
+      calls: 0,
+      fail_times: 9,
+      message: "400 invalid request",
+    }
+    let strict = @agent.RetryingClient::new(
+      refused,
+      describe=describe_transient,
+      wait=_ms => (),
+    )
+    let _ = @agent.LLMClient::execute(strict, prompt=one_prompt(), model~, tools=[]) catch {
+      e => @prompt.Message::assistant(e.to_string())
+    }
+    println("retry: a 400 took \{refused.calls} attempt(s)")
 
     // Routing: each provider's model reaches its registered client; else the fallback.
     let multi = @agent.MultiLLMClient::new()

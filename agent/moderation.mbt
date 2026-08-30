@@ -4,7 +4,7 @@
 pub(all) struct ModerationCategoryResult {
   detected : Bool
   confidence_score : Double?
-} derive(Eq, Debug)
+} derive(Eq, Debug, ToJson, FromJson)
 
 ///|
 /// A moderation verdict (Koog `ModerationResult`): whether the content is harmful overall and
@@ -12,7 +12,7 @@ pub(all) struct ModerationCategoryResult {
 pub(all) struct ModerationResult {
   is_harmful : Bool
   categories : Map[String, ModerationCategoryResult]
-} derive(Eq, Debug)
+} derive(Eq, Debug, ToJson, FromJson)
 
 ///|
 /// A verdict that flags nothing — what a client without moderation support returns.

@@ -73,10 +73,13 @@ interface.
 ## Roadmap
 
 Transcription tracks Koog `1.1.1` module by module. Landed: the prompt model, the
-model catalog, the tool/registry model, and the `AIAgent` tool-calling loop.
-Next: the strategy-graph DSL (nodes/edges/subgraphs/parallel), structured output,
-streaming, multi-provider executors, memory and persistence, features, and the
-`a2a` / `rag` / MCP layers — plus the moon-heke integration (serving, checkpointing).
+model catalog, the tool/registry model, the `AIAgent` tool-calling loop, and the
+strategy graph it is one wiring of — nodes, edges with arbitrary conditions and
+transforms, nested subgraphs, and parallel nodes; per-agent `LLMParams`, native
+structured output, a typed per-run store, node-boundary checkpointing with resume,
+and a retry with backoff and error classification. Next: multi-provider executors,
+memory, features, and the `a2a` / `rag` / MCP layers — plus the moon-heke
+integration (serving).
 
 ## Build
 

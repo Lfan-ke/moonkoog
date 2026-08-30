@@ -2,6 +2,7 @@
 package "Lfan-ke/moonkoog/persistence"
 
 import {
+  "Lfan-ke/moonkoog/llm",
   "Lfan-ke/moonkoog/prompt",
   "moonbitlang/core/debug",
 }
@@ -15,16 +16,24 @@ pub(all) struct AgentCheckpoint {
   checkpoint_id : String
   created_at : Int64
   message_history : Array[@prompt.Message]
-  node_id : String?
-  last_input : String?
+  llm_params : @prompt.LLMParams?
+  llm_model : @llm.LLModel?
+  tools : Array[String]?
+  storage : Json
+  node_id : String
+  last_input : Json?
   agent_iterations : Int
   version : Int64
 } derive(Eq, @debug.Debug)
+pub fn AgentCheckpoint::new(checkpoint_id~ : String, created_at~ : Int64, node_id~ : String, message_history? : Array[@prompt.Message], llm_params? : @prompt.LLMParams?, llm_model? : @llm.LLModel?, tools? : Array[String]?, storage? : Json, last_input? : Json?, agent_iterations? : Int, version? : Int64) -> Self
 
 pub struct InMemoryPersistence {
   by_session : Map[String, Array[AgentCheckpoint]]
 }
+pub fn InMemoryPersistence::get_checkpoints(Self, String) -> Array[AgentCheckpoint]
+pub fn InMemoryPersistence::get_latest_checkpoint(Self, String) -> AgentCheckpoint?
 pub fn InMemoryPersistence::new() -> Self
+pub fn InMemoryPersistence::save_checkpoint(Self, String, AgentCheckpoint) -> Unit
 pub impl PersistenceStorageProvider for InMemoryPersistence
 
 // Type aliases
